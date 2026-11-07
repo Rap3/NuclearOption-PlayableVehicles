@@ -1,9 +1,4 @@
 # Changelog
-
-Versioning follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH` + pre-release suffix
-(`-beta`). MAJOR — breaking changes (multiplayer protocol incompatible with older builds), MINOR — new
-features backwards-compatible, PATCH — bug fixes only. Pre-release suffix marks unreleased development.
-
 ## 1.1.0
 
 - **Own running gear for vehicles:** wheels and road wheels with suspension (progressive bump stop, separate bump
