@@ -51,18 +51,26 @@ namespace PlayableVehicles
             return false;
         }
 
-        public static bool PredictImpact(in GunProfile profile, Transform ignoreRoot, out Vector3 point)
+        public static bool PredictImpact(in GunProfile profile, Transform ignoreRoot, out Vector3 point, out float timeOfFlight)
         {
-            Vector3 position = profile.Muzzle.position;
-            Vector3 velocity = profile.InheritedVelocity + profile.Muzzle.forward * profile.Speed;
+            return PredictImpact(profile.Muzzle.position,
+                profile.InheritedVelocity + profile.Muzzle.forward * profile.Speed,
+                profile.GravMult, profile.Speed > 0f ? profile.DragCoef / profile.Speed : 0f,
+                profile.Lifetime, ignoreRoot, out point, out timeOfFlight);
+        }
+
+        public static bool PredictImpact(Vector3 position, Vector3 velocity, float gravMult, float dragK,
+            float lifetime, Transform ignoreRoot, out Vector3 point, out float timeOfFlight)
+        {
+            float speed0Sqr = velocity.sqrMagnitude;
             Vector3 segmentStart = position;
-            float minSpeedSqr = profile.Speed * profile.Speed * 0.02f;
-            int steps = Mathf.CeilToInt(profile.Lifetime / Step);
+            float minSpeedSqr = speed0Sqr * 0.02f;
+            int steps = Mathf.CeilToInt(lifetime / Step);
             int segmentStep = 0;
 
             for (int i = 1; i <= steps; i++)
             {
-                Integrate(profile, ref position, ref velocity);
+                Integrate(gravMult, dragK, ref position, ref velocity);
                 bool last = i == steps || velocity.sqrMagnitude < minSpeedSqr;
 
                 segmentStep++;
@@ -74,6 +82,7 @@ namespace PlayableVehicles
                     if (length > 0.001f && AimRaycast.Cast(segmentStart, segment / length, length, ignoreRoot, out RaycastHit hit))
                     {
                         point = hit.point;
+                        timeOfFlight = i * Step;
                         return true;
                     }
                     segmentStart = position;
@@ -82,6 +91,7 @@ namespace PlayableVehicles
             }
 
             point = position;
+            timeOfFlight = steps * Step;
             return false;
         }
 
@@ -142,7 +152,7 @@ namespace PlayableVehicles
                 if (time <= 0f) break;
                 interceptPoint = targetPosition + targetVelocity * time;
             }
-            return Solve(profile, interceptPoint, out offset, out _) && reachable;
+            return reachable && Solve(profile, interceptPoint, out offset, out _);
         }
 
         public static bool CrossDescending(in GunProfile profile, Vector3 origin, Vector3 velocity, float targetY, out Vector3 point, out float time)
@@ -170,8 +180,13 @@ namespace PlayableVehicles
 
         private static void Integrate(in GunProfile profile, ref Vector3 position, ref Vector3 velocity)
         {
-            velocity.y -= 9.81f * Step * profile.GravMult;
-            velocity -= velocity.magnitude * velocity * (profile.DragCoef * Step / profile.Speed);
+            Integrate(profile.GravMult, profile.Speed > 0f ? profile.DragCoef / profile.Speed : 0f, ref position, ref velocity);
+        }
+
+        private static void Integrate(float gravMult, float dragK, ref Vector3 position, ref Vector3 velocity)
+        {
+            velocity.y -= 9.81f * Step * gravMult;
+            velocity -= velocity.magnitude * velocity * (dragK * Step);
             position += velocity * Step;
         }
     }

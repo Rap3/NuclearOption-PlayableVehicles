@@ -15,6 +15,9 @@ namespace PlayableVehicles
         public static AccessTools.FieldRef<Turret, Unit> TurretAttachedUnit { get; private set; }
         public static Action<Turret, Vector3> TurretAimTurret { get; private set; }
         public static AccessTools.FieldRef<Turret, Transform> TurretElevationTransform { get; private set; }
+        public static AccessTools.FieldRef<Turret, float> TurretTraverseAngle { get; private set; }
+        public static AccessTools.FieldRef<Turret, float> TurretElevationAngle { get; private set; }
+        public static AccessTools.FieldRef<Turret, FireControl> TurretFireControl { get; private set; }
 
         public static AccessTools.FieldRef<UnitPart, bool> UnitPartCriticalPart { get; private set; }
 
@@ -23,7 +26,18 @@ namespace PlayableVehicles
         public static AccessTools.FieldRef<GroundVehicle, Array> GroundVehicleDeployableParts { get; private set; }
         public static AccessTools.FieldRef<GroundVehicle, bool> GroundVehicleMobile { get; private set; }
         public static AccessTools.FieldRef<GroundVehicle, GameObject[]> GroundVehicleWheels { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, Renderer> GroundVehicleTracks { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, AudioSource> GroundVehicleEngineIdleSound { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, AudioSource> GroundVehicleEngineDriveSound { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, float> GroundVehicleEngineMinPitch { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, float> GroundVehicleEngineMaxPitch { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, PathfindingAgent> GroundVehiclePathfinder { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, List<Obstacle>> GroundVehicleObstacles { get; private set; }
+        public static AccessTools.FieldRef<GroundVehicle, bool> GroundVehicleAnchored { get; private set; }
+        public static AccessTools.FieldRef<PathfindingAgent, List<GlobalPosition>> PathfindingAgentWaypoints { get; private set; }
+        public static AccessTools.FieldRef<PathfindingAgent, List<RoadPathfinding.Node>> PathfindingAgentNodes { get; private set; }
         public static AccessTools.FieldRef<GroundVehicle, float> GroundVehicleAcceleration { get; private set; }
+        public static AccessTools.FieldRef<Gun, float> GunRecoilImpulse { get; private set; }
         public static AccessTools.FieldRef<GroundVehicle, float> GroundVehicleTopSpeedOnroad { get; private set; }
         public static AccessTools.FieldRef<GroundVehicle, float> GroundVehicleTopSpeedOffroad { get; private set; }
         public static AccessTools.FieldRef<GroundVehicle, float> GroundVehicleSuspensionTravel { get; private set; }
@@ -127,8 +141,15 @@ namespace PlayableVehicles
         public static AccessTools.FieldRef<CombatHUD, GameObject> CombatHudHitMarker { get; private set; }
         public static AccessTools.FieldRef<Gun, Transform[]> GunMuzzles { get; private set; }
         public static AccessTools.FieldRef<Gun, float> GunBulletSelfDestruct { get; private set; }
+        public static AccessTools.FieldRef<Gun, float> GunMuzzleVelocity { get; private set; }
         public static AccessTools.FieldRef<Gun, MissileDefinition> GunGuidedProjectile { get; private set; }
         public static AccessTools.FieldRef<Gun, bool> GunProximityTimer { get; private set; }
+        public static AccessTools.FieldRef<Gun, float> GunFireInterval { get; private set; }
+        public static AccessTools.FieldRef<Gun, float> GunReloadTime { get; private set; }
+        public static AccessTools.FieldRef<Gun, int> GunBulletsLoaded { get; private set; }
+        public static AccessTools.FieldRef<Gun, int> GunMagazines { get; private set; }
+        public static AccessTools.FieldRef<Gun, int> GunMagazineCapacity { get; private set; }
+        public static AccessTools.FieldRef<Gun, int> GunMaxMagazines { get; private set; }
         public static AccessTools.FieldRef<VehicleDepot, float> VehicleDepotSpawnCooldown { get; private set; }
         public static AccessTools.FieldRef<VehicleDepot, float> VehicleDepotLastSpawnedTime { get; private set; }
         public static AccessTools.FieldRef<VehicleDepot, Transform> VehicleDepotSpawnTransform { get; private set; }
@@ -147,6 +168,24 @@ namespace PlayableVehicles
         public static AccessTools.FieldRef<CameraSelectionState, float> SelectionCameraDistance { get; private set; }
         public static AccessTools.FieldRef<CameraSelectionState, float> SelectionCameraViewDistance { get; private set; }
         public static AccessTools.FieldRef<CameraSelectionState, float> SelectionCameraOrbitalAngle { get; private set; }
+
+        public static AccessTools.FieldRef<RadialMenuMain, GameObject> RadialMenuObject { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, CanvasGroup> RadialMenuCanvasGroup { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, GameObject> RadialMenuMainContainer { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, GameObject> RadialMenuWeaponsContainer { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, GameObject> RadialMenuSector { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, GameObject> RadialMenuActionPrefab { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, RadialMenuAction> RadialMenuWeaponAction { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, RadialMenuAction[]> RadialMenuMainActions { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuMain, TMP_Text> RadialMenuSelectedText { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuAction, Sprite> RadialMenuActionIcon { get; private set; }
+        public static AccessTools.FieldRef<RadialMenuAction, RadialMenuAction.ActionType> RadialMenuActionKind { get; private set; }
+
+        public static bool RadialMenuAvailable =>
+            RadialMenuObject != null && RadialMenuCanvasGroup != null && RadialMenuMainContainer != null
+            && RadialMenuWeaponsContainer != null && RadialMenuSector != null && RadialMenuActionPrefab != null
+            && RadialMenuWeaponAction != null && RadialMenuMainActions != null && RadialMenuSelectedText != null
+            && RadialMenuActionIcon != null && RadialMenuActionKind != null;
 
         public static bool SelectionCameraAvailable =>
             SelectionCameraTarget != null && SelectionCameraFixedTarget != null && SelectionCameraAllowMoveToDropFocus != null
@@ -168,6 +207,9 @@ namespace PlayableVehicles
             TurretAttachedUnit = Field<Turret, Unit>("attachedUnit");
             TurretAimTurret = Method<Action<Turret, Vector3>>(typeof(Turret), "AimTurret", typeof(Vector3));
             TurretElevationTransform = Field<Turret, Transform>("elevationTransform");
+            TurretTraverseAngle = Field<Turret, float>("traverseAngle");
+            TurretElevationAngle = Field<Turret, float>("elevationAngle");
+            TurretFireControl = OptionalField<Turret, FireControl>("fireControl");
 
             UnitPartCriticalPart = Field<UnitPart, bool>("criticalPart");
 
@@ -188,13 +230,31 @@ namespace PlayableVehicles
             CombatHudHitMarker = OptionalField<CombatHUD, GameObject>("hitMarker");
             GunMuzzles = OptionalField<Gun, Transform[]>("muzzles");
             GunBulletSelfDestruct = OptionalField<Gun, float>("bulletSelfDestruct");
+            GunMuzzleVelocity = OptionalField<Gun, float>("muzzleVelocity");
             GunGuidedProjectile = OptionalField<Gun, MissileDefinition>("guidedProjectile");
             GunProximityTimer = OptionalField<Gun, bool>("proximityTimer");
+            GunFireInterval = OptionalField<Gun, float>("fireInterval");
+            GunReloadTime = OptionalField<Gun, float>("reloadTime");
+            GunBulletsLoaded = OptionalField<Gun, int>("bulletsLoaded");
+            GunMagazines = OptionalField<Gun, int>("magazines");
+            GunMagazineCapacity = OptionalField<Gun, int>("magazineCapacity");
+            GunMaxMagazines = OptionalField<Gun, int>("maxMagazines");
             GroundVehicleDeployableParts = OptionalField<GroundVehicle, Array>("deployableParts");
             GroundVehicleMobile = OptionalField<GroundVehicle, bool>("mobile");
             GroundVehicleWheels = OptionalField<GroundVehicle, GameObject[]>("wheels");
+            GroundVehicleTracks = OptionalField<GroundVehicle, Renderer>("tracks");
+            GroundVehicleEngineIdleSound = OptionalField<GroundVehicle, AudioSource>("engineIdleSound");
+            GroundVehicleEngineDriveSound = OptionalField<GroundVehicle, AudioSource>("engineDriveSound");
+            GroundVehicleEngineMinPitch = OptionalField<GroundVehicle, float>("engineMinPitch");
+            GroundVehicleEngineMaxPitch = OptionalField<GroundVehicle, float>("engineMaxPitch");
+            GroundVehiclePathfinder = OptionalField<GroundVehicle, PathfindingAgent>("pathfinder");
+            GroundVehicleObstacles = OptionalField<GroundVehicle, List<Obstacle>>("obstacles");
+            GroundVehicleAnchored = OptionalField<GroundVehicle, bool>("anchored");
+            PathfindingAgentWaypoints = OptionalField<PathfindingAgent, List<GlobalPosition>>("waypoints");
+            PathfindingAgentNodes = OptionalField<PathfindingAgent, List<RoadPathfinding.Node>>("nodes");
             GroundVehicleAcceleration = OptionalField<GroundVehicle, float>("acceleration");
             GroundVehicleTopSpeedOnroad = OptionalField<GroundVehicle, float>("topSpeedOnroad");
+            GunRecoilImpulse = OptionalField<Gun, float>("recoilImpulse");
             GroundVehicleTopSpeedOffroad = OptionalField<GroundVehicle, float>("topSpeedOffroad");
             GroundVehicleSuspensionTravel = OptionalField<GroundVehicle, float>("suspensionTravel");
             GroundVehicleSpringRate = OptionalField<GroundVehicle, float>("springRate");
@@ -203,6 +263,17 @@ namespace PlayableVehicles
             MobileArtilleryAISetState = OptionalEnumSetter<MobileArtilleryAI>("currentState");
             MobileArtilleryAITargetSearch = OptionalMethod<Func<MobileArtilleryAI, UniTask>>(typeof(MobileArtilleryAI), "TargetSearch");
             FireControlAttachedUnit = OptionalField<FireControl, Unit>("attachedUnit");
+            RadialMenuObject = OptionalField<RadialMenuMain, GameObject>("menuObject");
+            RadialMenuCanvasGroup = OptionalField<RadialMenuMain, CanvasGroup>("canvasGroup");
+            RadialMenuMainContainer = OptionalField<RadialMenuMain, GameObject>("actionsMainContainer");
+            RadialMenuWeaponsContainer = OptionalField<RadialMenuMain, GameObject>("actionsWeaponsContainer");
+            RadialMenuSector = OptionalField<RadialMenuMain, GameObject>("sectorObject");
+            RadialMenuActionPrefab = OptionalField<RadialMenuMain, GameObject>("actionPrefab");
+            RadialMenuWeaponAction = OptionalField<RadialMenuMain, RadialMenuAction>("actionWeaponPrefab");
+            RadialMenuMainActions = OptionalField<RadialMenuMain, RadialMenuAction[]>("actionsMain");
+            RadialMenuSelectedText = OptionalField<RadialMenuMain, TMP_Text>("selectedActionText");
+            RadialMenuActionIcon = OptionalField<RadialMenuAction, Sprite>("iconSprite");
+            RadialMenuActionKind = OptionalField<RadialMenuAction, RadialMenuAction.ActionType>("actionType");
             UnitDebugTarget = OptionalField<UnitDebug, TMPro.TMP_Text>("target");
             UnitDebugFollowingUnit = OptionalField<UnitDebug, Unit>("followingUnit");
             TurretAimSolver = OptionalField<Turret, AimSolver>("aimSolver");

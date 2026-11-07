@@ -6,13 +6,20 @@ namespace PlayableVehicles
     internal sealed class AimWidget : HudWidget
     {
         private const float OnTargetToleranceDegrees = 0.75f;
+        private const float BlockedMargin = 15f;
+        private const float BlockedFraction = 0.05f;
+        private const float BlockedAngleDegrees = 4f;
+        private static readonly Vector2 LabelOffset = new Vector2(0f, -38f);
         private const float CenterScale = 0.6f;
+
         private const float CenterAlpha = 0.55f;
 
         private RectTransform _center;
         private GameHudParts.TurretCrosshair _gun;
         private RawImage _fallbackMarker;
         private Texture2D _ringTexture;
+        private TMPro.TextMeshProUGUI _label;
+        private int _labelKey = int.MinValue;
 
         public override void Build(RectTransform root, HudContext context)
         {
@@ -37,16 +44,85 @@ namespace PlayableVehicles
             _center.anchoredPosition = Vector2.zero;
 
             _gun = GameHudParts.Crosshair(root);
-            if (_gun == null)
+            if (_gun != null)
+            {
+                _gun.Root.localScale *= ModConfig.GunMarkerScale.Value;
+            }
+            else
             {
                 _ringTexture = HudStyle.CreateRingTexture(64, 3f);
-                _fallbackMarker = HudStyle.CreateRawImage("GunMarker", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34f, 34f),
+                float size = 34f * ModConfig.GunMarkerScale.Value;
+                _fallbackMarker = HudStyle.CreateRawImage("GunMarker", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size),
                     _ringTexture, HudStyle.Normal);
+            }
+
+            Transform markerRoot = _gun != null ? (Transform)_gun.Root : _fallbackMarker.transform;
+            _label = HudStyle.CreateText("ImpactLabel", markerRoot, new Vector2(0.5f, 0.5f), LabelOffset, new Vector2(260f, 24f),
+                16f, TMPro.TextAlignmentOptions.Center);
+            _label.raycastTarget = false;
+            _label.gameObject.SetActive(false);
+        }
+
+        private enum Impact
+        {
+            OnCourse,
+            Sky,
+            Blocked,
+            OutOfReach,
+        }
+
+        private static Impact Classify(HudContext context, TurretController turrets, Vector3 point, out float impactDistance)
+        {
+            Vector3 from = context.Vehicle.transform.position;
+            impactDistance = Vector3.Distance(from, point);
+            if (!turrets.ImpactHit || turrets.Range == TurretController.RangeState.OutOfReach
+                || turrets.Range == TurretController.RangeState.BeyondMaxRange)
+            {
+                return Impact.OutOfReach;
+            }
+            if (!turrets.HasAimHit && !turrets.IsTracking) return Impact.Sky;
+            float aim = Vector3.Distance(from, turrets.AimTargetPoint);
+            if (impactDistance >= aim - Mathf.Max(BlockedMargin, aim * BlockedFraction)) return Impact.OnCourse;
+            float angle = Vector3.Angle(point - from, turrets.AimTargetPoint - from);
+            return angle <= BlockedAngleDegrees ? Impact.Blocked : Impact.OnCourse;
+        }
+
+        private void UpdateLabel(Impact impact, float distance)
+        {
+            bool show = impact != Impact.OnCourse;
+            if (_label.gameObject.activeSelf != show) _label.gameObject.SetActive(show);
+            if (!show) return;
+
+            int key = (int)impact * 1000000 + Mathf.RoundToInt(distance);
+            if (key == _labelKey) return;
+            _labelKey = key;
+            switch (impact)
+            {
+                case Impact.OutOfReach:
+                    _label.text = "OUT OF REACH";
+                    _label.color = HudStyle.Alert;
+                    break;
+                case Impact.Blocked:
+                    _label.text = "BLOCKED " + UnitConverter.DistanceReading(distance);
+                    _label.color = HudStyle.Warning;
+                    break;
+                default:
+                    _label.text = UnitConverter.DistanceReading(distance);
+                    _label.color = HudStyle.Normal;
+                    break;
             }
         }
 
         public override void Refresh(HudContext context)
         {
+            if (ProjectileCam.IsActive)
+            {
+                if (_center.gameObject.activeSelf) _center.gameObject.SetActive(false);
+                GameObject camMarker = _gun != null ? _gun.Root.gameObject : _fallbackMarker.gameObject;
+                if (camMarker.activeSelf) camMarker.SetActive(false);
+                return;
+            }
+
             TurretController turrets = context.Turrets;
 
             bool zoomed = context.View.IsZoomed;
@@ -65,12 +141,14 @@ namespace PlayableVehicles
             if (!visible) return;
 
             marker.transform.position = new Vector3(screen.x, screen.y, 0f);
-            bool outOfRange = turrets.Range == TurretController.RangeState.OutOfReach
-                || turrets.Range == TurretController.RangeState.BeyondMaxRange;
+            Impact impact = Classify(context, turrets, markerPoint, out float impactDistance);
+            UpdateLabel(impact, impactDistance);
+            bool outOfRange = impact == Impact.OutOfReach;
+            bool blocked = impact == Impact.Blocked;
 
             if (_gun == null)
             {
-                _fallbackMarker.color = outOfRange ? HudStyle.Alert : onTarget ? HudStyle.Normal : HudStyle.Warning;
+                _fallbackMarker.color = outOfRange ? HudStyle.Alert : blocked ? HudStyle.Warning : onTarget ? HudStyle.Normal : HudStyle.Warning;
                 return;
             }
 
@@ -86,7 +164,10 @@ namespace PlayableVehicles
                 bool ready = onTarget && !reloading && !outOfRange;
                 if (_gun.Circle.enabled != ready) _gun.Circle.enabled = ready;
             }
-            _gun.Cross.color = outOfRange ? HudStyle.Alert : reloading ? HudStyle.Alert + HudStyle.Normal * 0.5f : HudStyle.Normal;
+            _gun.Cross.color = outOfRange ? HudStyle.Alert
+                : blocked ? HudStyle.Warning
+                : reloading ? HudStyle.Alert + HudStyle.Normal * 0.5f
+                : HudStyle.Normal;
         }
 
         public override void Dispose()

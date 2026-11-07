@@ -25,6 +25,7 @@ namespace PlayableVehicles
         public abstract void Refresh(HudContext context);
         public virtual void Tick(HudContext context) { }
         public virtual void Dispose() { }
+        public virtual bool VisibleInProjectileCam => false;
     }
 
     internal sealed class VehicleHud
@@ -34,6 +35,7 @@ namespace PlayableVehicles
             public HudWidget Widget;
             public GameObject[] Objects;
             public bool Failed;
+            public bool HiddenByProjectileCam;
         }
 
         private readonly HudContext _context = new HudContext();
@@ -69,6 +71,7 @@ namespace PlayableVehicles
             Add(new HitDirectionWidget(), rootRect);
             Add(new OpticWidget(), rootRect);
             Add(new AimWidget(), rootRect);
+            Add(new ProjectileCamWidget(), rootRect);
             Add(new LockWidget(), rootRect);
             Add(new GaugesWidget(), rootRect);
             Add(new CompassWidget(), rootRect);
@@ -177,10 +180,30 @@ namespace PlayableVehicles
 
             _context.Camera = camera;
             _context.ScaleFactor = _canvas.scaleFactor > 0.01f ? _canvas.scaleFactor : 1f;
+            bool projectileCam = ProjectileCam.IsActive;
             for (int i = 0; i < _widgets.Count; i++)
             {
                 Entry entry = _widgets[i];
                 if (entry.Failed) continue;
+                if (projectileCam && !entry.Widget.VisibleInProjectileCam)
+                {
+                    for (int o = 0; o < entry.Objects.Length; o++)
+                    {
+                        GameObject obj = entry.Objects[o];
+                        if (obj != null && obj.activeSelf) obj.SetActive(false);
+                    }
+                    entry.HiddenByProjectileCam = true;
+                    continue;
+                }
+                if (entry.HiddenByProjectileCam)
+                {
+                    entry.HiddenByProjectileCam = false;
+                    for (int o = 0; o < entry.Objects.Length; o++)
+                    {
+                        GameObject obj = entry.Objects[o];
+                        if (obj != null && !obj.activeSelf) obj.SetActive(true);
+                    }
+                }
                 try
                 {
                     entry.Widget.Refresh(_context);

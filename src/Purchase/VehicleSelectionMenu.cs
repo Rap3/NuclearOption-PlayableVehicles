@@ -209,6 +209,7 @@ namespace PlayableVehicles
                 else Back();
                 return;
             }
+            if (HandleGamepad()) return;
             if (Time.unscaledTime >= _nextRefresh) Refresh();
             UpdateEscalation();
             if (_light != null && _preview != null)
@@ -216,6 +217,91 @@ namespace PlayableVehicles
                 _light.enabled = NetworkSceneSingleton<LevelInfo>.i != null
                     && (NetworkSceneSingleton<LevelInfo>.i.timeOfDay < 6f || NetworkSceneSingleton<LevelInfo>.i.timeOfDay > 18f);
             }
+        }
+
+        private static bool HandleGamepad()
+        {
+            if (_confirm.activeSelf)
+            {
+                if (MenuGamepad.Confirm) ConfirmDeploy();
+                else if (MenuGamepad.Back) _confirm.SetActive(false);
+                return !IsOpen;
+            }
+            if (MenuGamepad.Back)
+            {
+                Close();
+                return true;
+            }
+            if (MenuGamepad.Confirm)
+            {
+                if (_deploy.interactable) Deploy();
+                return false;
+            }
+            if (MenuGamepad.NextTab) CycleTab(1);
+            else if (MenuGamepad.PreviousTab) CycleTab(-1);
+            if (MenuGamepad.Extra) CycleDepot(1);
+
+            Vector2Int step = MenuGamepad.Step();
+            if (step != Vector2Int.zero) MoveSelection(step);
+            return false;
+        }
+
+        private static void CycleTab(int step)
+        {
+            if (_tabs.Count == 0) return;
+            int index = _tabs.FindIndex(tab => tab.type == _tab);
+            index = ((index < 0 ? 0 : index + step) % _tabs.Count + _tabs.Count) % _tabs.Count;
+            SelectTab(_tabs[index].type);
+            ScrollToSelected();
+        }
+
+        private static void MoveSelection(Vector2Int step)
+        {
+            var visible = new List<Entry>();
+            foreach (Entry entry in _entries)
+            {
+                if (entry.Root.activeSelf) visible.Add(entry);
+            }
+            if (visible.Count == 0) return;
+            int index = Mathf.Max(visible.IndexOf(_selected), 0);
+            int columns = GridColumns();
+            int delta = step.x != 0 ? step.x : -step.y * columns;
+            int next = index + delta;
+            if (step.x != 0) next = (next % visible.Count + visible.Count) % visible.Count;
+            else if (next < 0 || next >= visible.Count) return;
+            Select(visible[next]);
+            ScrollToSelected();
+        }
+
+        private static int GridColumns()
+        {
+            GridLayoutGroup layout = _grid != null ? _grid.GetComponent<GridLayoutGroup>() : null;
+            if (layout == null) return 1;
+            float width = _grid.rect.width - layout.padding.left - layout.padding.right;
+            return Mathf.Max(1, Mathf.FloorToInt((width + layout.spacing.x) / (layout.cellSize.x + layout.spacing.x)));
+        }
+
+        private static void ScrollToSelected()
+        {
+            if (_selected == null || _gridViewport == null || _grid == null) return;
+            GridLayoutGroup layout = _grid.GetComponent<GridLayoutGroup>();
+            if (layout == null) return;
+            int index = 0;
+            foreach (Entry entry in _entries)
+            {
+                if (entry == _selected) break;
+                if (entry.Root.activeSelf) index++;
+            }
+            int row = index / GridColumns();
+            float rowHeight = layout.cellSize.y + layout.spacing.y;
+            float top = layout.padding.top + row * rowHeight;
+            float bottom = top + layout.cellSize.y;
+            float view = _gridViewport.rect.height;
+            float position = _grid.anchoredPosition.y;
+            if (top < position) position = top;
+            else if (bottom > position + view) position = bottom - view;
+            float max = Mathf.Max(0f, _grid.rect.height - view);
+            _grid.anchoredPosition = new Vector2(_grid.anchoredPosition.x, Mathf.Clamp(position, 0f, max));
         }
 
         private static void Refresh()
@@ -454,7 +540,7 @@ namespace PlayableVehicles
         private static string Availability(Player player, Entry entry, out bool restricted)
         {
             restricted = true;
-            if (player.HQ.preventDonation) return "Purchasing vehicles is disabled in this mission";
+            if (player.HQ.preventDonation && (_point == null || !_point.IsAirbase)) return "Purchasing vehicles is disabled in this mission";
             VehicleShop.Result restriction = VehicleShop.Restriction(player, entry.Definition);
             if (restriction != VehicleShop.Result.Purchased) return VehicleShop.RestrictionText(restriction, entry.Definition);
             float cooldown = PurchaseClient.CooldownRemaining(entry.Definition);

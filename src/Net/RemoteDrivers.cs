@@ -20,8 +20,12 @@ namespace PlayableVehicles
             public ushort LastInputSeq;
             public float NextDamageDirectionTime;
             public float NextEchoTime;
+            public float NextInputAt;
+            public float NextDeployAt;
+            public float NextLogisticsAt;
             public float NextIncomingHitTime;
             public PvStationAmmo[] AmmoSent;
+            public PvStationAmmo[] AmmoBuild;
             public int AmmoSentCount;
             public bool AmmoSentRearm;
             public float NextAmmoTime;
@@ -29,6 +33,11 @@ namespace PlayableVehicles
         }
 
         private const float HitDedupWindow = 0.1f;
+        private const float MinInputInterval = 0.03f;
+        private const float MinDeployInterval = 0.25f;
+        internal const float MinLogisticsInterval = 0.25f;
+        private const float MinEnterInterval = 0.4f;
+        private static readonly Dictionary<INetworkPlayer, float> _nextEnterAt = new Dictionary<INetworkPlayer, float>();
         private const float InputTimeout = 10f;
         private const float DamageDirectionInterval = 0.1f;
         private const float EchoInterval = 0.2f;
@@ -51,6 +60,14 @@ namespace PlayableVehicles
                 return;
             }
 
+            float now = Time.unscaledTime;
+            if (_nextEnterAt.TryGetValue(connection, out float nextEnter) && now < nextEnter)
+            {
+                Reply(connection, message.VehicleId, PvReply.Busy);
+                return;
+            }
+            _nextEnterAt[connection] = now + MinEnterInterval;
+
             Player player = connection.Identity != null ? connection.Identity.GetComponent<Player>() : null;
             PvReply reply = Validate(message.VehicleId, player, out GroundVehicle vehicle);
             if (reply != PvReply.Granted)
@@ -64,7 +81,18 @@ namespace PlayableVehicles
 
             VehicleDriver driver = vehicle.gameObject.GetComponent<VehicleDriver>() ?? vehicle.gameObject.AddComponent<VehicleDriver>();
             driver.enabled = true;
-            driver.Init(vehicle, VehicleDriver.DriveMode.ServerForClient);
+            try
+            {
+                driver.Init(vehicle, VehicleDriver.DriveMode.ServerForClient);
+            }
+            catch (Exception e)
+            {
+                ModLog.Warning("Multiplayer: driver init failed on " + vehicle.unitName + ": " + e);
+                try { driver.Release(); } catch { }
+                driver.enabled = false;
+                Reply(connection, message.VehicleId, PvReply.Destroyed);
+                return;
+            }
             driver.Turrets.RemoteNotice = kind => connection.Send(new PvNotice { VehicleId = vehicle.persistentID.Id, Kind = kind }, Channel.Reliable);
             KillCredit.Begin(vehicle, player);
 
@@ -88,6 +116,8 @@ namespace PlayableVehicles
             Session session = Find(connection);
             if (session == null || session.Vehicle == null || session.Vehicle.persistentID.Id != message.VehicleId) return;
             session.LastInputTime = Time.unscaledTime;
+            if (Time.unscaledTime < session.NextInputAt) return;
+            session.NextInputAt = Time.unscaledTime + MinInputInterval;
             if (session.HasInputSeq)
             {
                 int delta = unchecked((short)(message.Seq - session.LastInputSeq));
@@ -108,6 +138,8 @@ namespace PlayableVehicles
         {
             Session session = Find(connection);
             if (session == null || session.Vehicle == null || session.Vehicle.persistentID.Id != message.VehicleId) return;
+            if (Time.unscaledTime < session.NextDeployAt) return;
+            session.NextDeployAt = Time.unscaledTime + MinDeployInterval;
             if (!VehicleDeploy.CanDeploy(session.Vehicle)) return;
             if (message.Deploy && session.Driver.BodyVelocity.magnitude > VehicleDeploy.MaxDeploySpeed * 2f) return;
             VehicleDeploy.Set(session.Vehicle, message.Deploy);
@@ -117,6 +149,7 @@ namespace PlayableVehicles
         {
             Session session = Find(connection);
             if (session != null) End(session, false);
+            _nextEnterAt.Remove(connection);
         }
 
         public static void Tick()
@@ -143,11 +176,13 @@ namespace PlayableVehicles
             {
                 End(_sessions[i], false);
             }
+            _nextEnterAt.Clear();
         }
 
         private static PvReply Validate(uint vehicleId, Player player, out GroundVehicle vehicle)
         {
             vehicle = null;
+            if (!ModConfig.Enabled.Value) return PvReply.Disabled;
             if (!UnitRegistry.TryGetUnit(new PersistentID?(new PersistentID { Id = vehicleId }), out Unit unit)) return PvReply.NotFound;
             vehicle = unit as GroundVehicle;
             if (vehicle == null) return PvReply.NotFound;

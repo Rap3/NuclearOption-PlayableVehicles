@@ -1,0 +1,331 @@
+{
+  "prefab": "Linebreaker_IFV",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "ifv_tracked",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        3.0,
+        1.2,
+        1.0,
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "path": "IFV_turret",
+      "zones": [
+        3.0,
+        1.2,
+        1.0,
+        0.5,
+        1.0
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "glacis",
+      "part": "",
+      "zone": "roof",
+      "center": [
+        0.0,
+        0.62,
+        2.45
+      ],
+      "size": [
+        3.9,
+        0.9,
+        3.4
+      ],
+      "mult": 2.0,
+      "spall": 1.0,
+      "detonation": -1.0
+    }
+  ],
+  "modules": [
+    {
+      "id": "ammo",
+      "kind": "ammo",
+      "part": "IFV_turret",
+      "center": [
+        0.0,
+        -1.0,
+        -0.95
+      ],
+      "size": [
+        1.2,
+        0.6,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "atgm_launcher",
+      "kind": "launcher",
+      "part": "IFV_turret",
+      "center": [
+        -1.58,
+        0.24,
+        0.67
+      ],
+      "size": [
+        0.5,
+        0.5,
+        1.4
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "breech",
+      "kind": "gun",
+      "part": "IFV_turret",
+      "center": [
+        -0.33,
+        0.0,
+        0.35
+      ],
+      "size": [
+        0.35,
+        0.35,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "commander",
+      "kind": "crew",
+      "part": "IFV_turret",
+      "center": [
+        -0.45,
+        -0.5,
+        -0.3
+      ],
+      "size": [
+        0.6,
+        1.0,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "commander_lower",
+      "kind": "crew",
+      "part": "IFV_turret",
+      "center": [
+        -0.45,
+        -1.4,
+        -0.3
+      ],
+      "size": [
+        0.6,
+        0.8,
+        0.7
+      ],
+      "external": false,
+      "link": "commander"
+    },
+    {
+      "id": "driver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        -0.95,
+        -0.1,
+        2.55
+      ],
+      "size": [
+        0.7,
+        0.9,
+        1.0
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        0.8,
+        -0.15,
+        2.285
+      ],
+      "size": [
+        1.54,
+        1.0,
+        1.57
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        1.365,
+        -0.4,
+        -2.45
+      ],
+      "size": [
+        0.27,
+        0.6,
+        1.1
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner",
+      "kind": "crew",
+      "part": "IFV_turret",
+      "center": [
+        0.45,
+        -0.6,
+        0.1
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner_lower",
+      "kind": "crew",
+      "part": "IFV_turret",
+      "center": [
+        0.45,
+        -1.4,
+        0.1
+      ],
+      "size": [
+        0.6,
+        0.8,
+        0.8
+      ],
+      "external": false,
+      "link": "gunner"
+    },
+    {
+      "id": "optics",
+      "kind": "optics",
+      "part": "IFV_turret",
+      "center": [
+        0.5,
+        0.6,
+        0.5
+      ],
+      "size": [
+        0.35,
+        0.3,
+        0.35
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "track_left",
+      "kind": "track",
+      "part": "",
+      "center": [
+        -1.45,
+        -0.65,
+        -0.06
+      ],
+      "size": [
+        0.55,
+        1.3,
+        6.7
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "track_right",
+      "kind": "track",
+      "part": "",
+      "center": [
+        1.45,
+        -0.65,
+        -0.06
+      ],
+      "size": [
+        0.55,
+        1.3,
+        6.7
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "transmission",
+      "kind": "transmission",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.305,
+        3.105
+      ],
+      "size": [
+        2.22,
+        0.41,
+        0.31
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_drive",
+      "kind": "turret_drive",
+      "part": "IFV_turret",
+      "center": [
+        0.8,
+        -0.4,
+        -0.6
+      ],
+      "size": [
+        0.4,
+        0.4,
+        0.4
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_ring",
+      "kind": "turret_ring",
+      "part": "",
+      "center": [
+        0.39,
+        0.95,
+        -0.91
+      ],
+      "size": [
+        2.0,
+        0.2,
+        2.0
+      ],
+      "external": false,
+      "link": ""
+    }
+  ]
+}

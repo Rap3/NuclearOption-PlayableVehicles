@@ -21,6 +21,7 @@ namespace PlayableVehicles
         Busy,
         Ended,
         NotOwned,
+        Disabled,
     }
 
     internal struct PvSessionReply
@@ -31,7 +32,7 @@ namespace PlayableVehicles
 
     internal static class PvProtocol
     {
-        public const byte Version = 6;
+        public const byte Version = 10;
         public const byte Legacy = 1;
         public const byte FirstVersioned = 2;
     }
@@ -54,6 +55,9 @@ namespace PlayableVehicles
         public float AimX;
         public float AimY;
         public float AimZ;
+        public float AimDirX;
+        public float AimDirY;
+        public float AimDirZ;
         public bool HasAimHit;
         public bool Fire;
         public byte Station;
@@ -159,6 +163,12 @@ namespace PlayableVehicles
         public uint VehicleId;
         public uint PlayerNetId;
         public bool Driving;
+    }
+
+    internal struct PvCargoStow
+    {
+        public uint VehicleId;
+        public bool Stow;
     }
 
     internal struct PvPurchaseRequest
@@ -270,6 +280,9 @@ namespace PlayableVehicles
                 w.WriteSingle(m.AimX);
                 w.WriteSingle(m.AimY);
                 w.WriteSingle(m.AimZ);
+                w.WriteSingle(m.AimDirX);
+                w.WriteSingle(m.AimDirY);
+                w.WriteSingle(m.AimDirZ);
                 w.WriteBoolean(m.HasAimHit);
                 w.WriteBoolean(m.Fire);
                 w.WriteByte(m.Station);
@@ -300,6 +313,9 @@ namespace PlayableVehicles
                 AimX = r.ReadSingle(),
                 AimY = r.ReadSingle(),
                 AimZ = r.ReadSingle(),
+                AimDirX = r.ReadSingle(),
+                AimDirY = r.ReadSingle(),
+                AimDirZ = r.ReadSingle(),
                 HasAimHit = r.ReadBoolean(),
                 Fire = r.ReadBoolean(),
                 Station = r.ReadByte(),
@@ -519,6 +535,13 @@ namespace PlayableVehicles
                 LoadMass = r.ReadSingle(),
             };
 
+            Writer<PvCargoStow>.Write = (w, m) =>
+            {
+                w.WriteUInt32(m.VehicleId);
+                w.WriteBoolean(m.Stow);
+            };
+            Reader<PvCargoStow>.Read = r => new PvCargoStow { VehicleId = r.ReadUInt32(), Stow = r.ReadBoolean() };
+
             Writer<PvHello>.Write = (w, m) => w.WriteByte(m.Version);
             Reader<PvHello>.Read = r => new PvHello { Version = r.ReadByte() };
 
@@ -568,6 +591,7 @@ namespace PlayableVehicles
             MessagePacker.RegisterMessage<PvDamageDirection>();
             MessagePacker.RegisterMessage<PvLogisticsRequest>();
             MessagePacker.RegisterMessage<PvLogistics>();
+            MessagePacker.RegisterMessage<PvCargoStow>();
             MessagePacker.RegisterMessage<PvInputEcho>();
             MessagePacker.RegisterMessage<PvIncomingHit>();
             MessagePacker.RegisterMessage<PvAmmoState>();
@@ -582,6 +606,7 @@ namespace PlayableVehicles
                 case PvReply.WrongFaction: return "Host: vehicle belongs to another faction";
                 case PvReply.Busy: return "Host: someone else is driving this vehicle";
                 case PvReply.NotOwned: return "Host: " + VehicleAccess.DeniedText;
+                case PvReply.Disabled: return "Host: vehicles are disabled on this server";
                 case PvReply.Ended: return "Host ended the vehicle session";
                 default: return "Host granted the vehicle";
             }

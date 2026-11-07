@@ -28,7 +28,7 @@ namespace PlayableVehicles
             _pending = vehicle;
             _pendingSince = Time.unscaledTime;
             NetBridge.SendToServer(new PvEnterRequest { VehicleId = vehicle.persistentID.Id }, Channel.Reliable);
-            ModLog.Notify("Requesting " + vehicle.unitName + " from host...");
+            ModLog.Info("Requesting " + vehicle.unitName + " from host...");
         }
 
         public static void SendExit(GroundVehicle vehicle)
@@ -192,6 +192,9 @@ namespace PlayableVehicles
                 AimX = aim.x,
                 AimY = aim.y,
                 AimZ = aim.z,
+                AimDirX = turrets.AimRayDir.x,
+                AimDirY = turrets.AimRayDir.y,
+                AimDirZ = turrets.AimRayDir.z,
                 HasAimHit = turrets.HasAimHit,
                 Fire = turrets.FireHeld,
                 Station = (byte)Mathf.Clamp(turrets.SelectedStationIndex, 0, 255),

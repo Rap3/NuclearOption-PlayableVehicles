@@ -49,6 +49,8 @@ namespace PlayableVehicles
             if (session == null || session.Vehicle == null || session.Vehicle.disabled || session.Driver == null
                 || session.Vehicle.persistentID.Id != message.VehicleId) return;
             GroundVehicle vehicle = session.Vehicle;
+            if (Time.unscaledTime < session.NextLogisticsAt) return;
+            session.NextLogisticsAt = Time.unscaledTime + RemoteDrivers.MinLogisticsInterval;
             if (vehicle.IsSlung()) return;
             float speed = session.Driver.RemotePoseSpeed;
 
@@ -129,8 +131,8 @@ namespace PlayableVehicles
                 case PvLogisticsEvent.HitchSlung: return name != null ? "Trailer unhitched: lifted by a helicopter (" + name + ")" : null;
                 case PvLogisticsEvent.NoTrailer: return "No trailer behind: reverse up to a trailer's tow bar";
                 case PvLogisticsEvent.Misaligned: return name != null ? "Line up with " + name + " to hitch it" : null;
-                case PvLogisticsEvent.TowBarLow: return "Trailer tow bar is too low - find flatter ground";
-                case PvLogisticsEvent.TowBarHigh: return "Trailer tow bar is too high - find flatter ground";
+                case PvLogisticsEvent.TowBarLow: return "Trailer kingpin is too low - find flatter ground";
+                case PvLogisticsEvent.TowBarHigh: return "Trailer kingpin is too high - find flatter ground";
                 case PvLogisticsEvent.StopToHitch: return "Stop the tractor to hitch a trailer";
                 case PvLogisticsEvent.Loaded: return name != null ? "Loaded " + name + ". " + key + " to unload" : null;
                 case PvLogisticsEvent.Unloaded: return name != null ? "Unloaded " + name : null;

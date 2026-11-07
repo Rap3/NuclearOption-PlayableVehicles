@@ -1,0 +1,280 @@
+{
+  "prefab": "SPAAG2",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "spaag_tracked",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        1.3,
+        0.75,
+        0.65,
+        0.4,
+        0.4
+      ]
+    },
+    {
+      "path": "turret",
+      "zones": [
+        1.2,
+        0.8,
+        0.7,
+        0.4,
+        0.8
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "glacis",
+      "part": "",
+      "zone": "roof",
+      "center": [
+        -0.0,
+        0.62,
+        2.45
+      ],
+      "size": [
+        3.9,
+        0.9,
+        3.4
+      ],
+      "mult": 2.0,
+      "spall": 1.0,
+      "detonation": -1.0
+    }
+  ],
+  "modules": [
+    {
+      "id": "ammo",
+      "kind": "ammo",
+      "part": "turret",
+      "center": [
+        -0.0,
+        -1.019,
+        -0.403
+      ],
+      "size": [
+        1.3,
+        0.6,
+        0.9
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "commander",
+      "kind": "crew",
+      "part": "turret",
+      "center": [
+        0.55,
+        -0.069,
+        -0.103
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "driver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        -0.95,
+        -0.1,
+        2.55
+      ],
+      "size": [
+        0.7,
+        0.9,
+        1.0
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        0.8,
+        -0.15,
+        2.285
+      ],
+      "size": [
+        1.54,
+        1.0,
+        1.57
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        1.365,
+        -0.4,
+        -2.45
+      ],
+      "size": [
+        0.27,
+        0.6,
+        1.1
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner",
+      "kind": "crew",
+      "part": "turret",
+      "center": [
+        -0.55,
+        -0.069,
+        -0.103
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "guns",
+      "kind": "gun",
+      "part": "turret/gun",
+      "center": [
+        0.0,
+        0.043,
+        1.605
+      ],
+      "size": [
+        0.754,
+        0.86,
+        3.983
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "radar",
+      "kind": "radar",
+      "part": "turret",
+      "center": [
+        -0.0,
+        0.731,
+        -0.053
+      ],
+      "size": [
+        0.9,
+        0.5,
+        0.6
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "track_left",
+      "kind": "track",
+      "part": "",
+      "center": [
+        -1.45,
+        -0.65,
+        -0.06
+      ],
+      "size": [
+        0.55,
+        1.3,
+        6.7
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "track_right",
+      "kind": "track",
+      "part": "",
+      "center": [
+        1.45,
+        -0.65,
+        -0.06
+      ],
+      "size": [
+        0.55,
+        1.3,
+        6.7
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "transmission",
+      "kind": "transmission",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.305,
+        3.105
+      ],
+      "size": [
+        2.22,
+        0.41,
+        0.31
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_drive",
+      "kind": "turret_drive",
+      "part": "turret",
+      "center": [
+        -0.0,
+        -0.269,
+        -1.203
+      ],
+      "size": [
+        0.6,
+        0.4,
+        0.5
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_ring",
+      "kind": "turret_ring",
+      "part": "",
+      "center": [
+        -0.0,
+        1.0,
+        -0.8
+      ],
+      "size": [
+        2.0,
+        0.25,
+        2.0
+      ],
+      "external": false,
+      "link": ""
+    }
+  ]
+}

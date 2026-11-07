@@ -1,0 +1,261 @@
+{
+  "prefab": "HLT-FT",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "truck",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "path": "fueltank",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "regions": [],
+  "modules": [
+    {
+      "id": "cargo_fuel",
+      "kind": "fuel",
+      "part": "fueltank",
+      "center": [
+        -0.0,
+        0.079,
+        -0.19
+      ],
+      "size": [
+        2.936,
+        1.877,
+        6.975
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "codriver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        0.6,
+        1.2,
+        3.7
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "driver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        -0.6,
+        1.2,
+        3.7
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        -0.0,
+        0.135,
+        3.365
+      ],
+      "size": [
+        0.56,
+        0.43,
+        1.03
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        -0.975,
+        -0.125,
+        -0.415
+      ],
+      "size": [
+        0.3,
+        0.4,
+        0.73
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "wheel1_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.05,
+        -0.282,
+        2.739
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.05,
+        -0.282,
+        2.739
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.05,
+        -0.282,
+        1.25
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.05,
+        -0.282,
+        1.25
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.05,
+        -0.282,
+        -2.5
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.05,
+        -0.282,
+        -2.5
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel4_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.05,
+        -0.282,
+        -4.01
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel4_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.05,
+        -0.282,
+        -4.01
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    }
+  ]
+}

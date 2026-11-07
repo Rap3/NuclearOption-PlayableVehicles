@@ -11,6 +11,32 @@ namespace PlayableVehicles
         private const float RestSpeed = 0.05f;
         private const float HeavySupportFactor = 20f;
         private readonly RaycastHit[] _groundHits = new RaycastHit[16];
+
+        private const float ContactTiltLimit = 20f;
+        private const float ContactNormalSmoothing = 0.05f;
+        private const float ContactStartMargin = 1f;
+        private const float MaxTrackedAccel = 30f;
+        private const float GripSteeringMargin = 0.9f;
+        private const float PitchPerAccel = 0.5f;
+        private const float RollPerAccel = 0.5f;
+        private const float MaxPitch = 3.5f;
+        private const float MaxRoll = 3.5f;
+        private const float TrackedWeightFactor = 0.6f;
+        private const float AccelSmoothing = 0.15f;
+
+        private const float TowedGripFriction = 0.45f;
+        private const float TowedLatSlip = 3f;
+        private const float TowedLongSlip = 0.8f;
+
+        private readonly Vector3[] _cornerPoints = new Vector3[4];
+        private float _halfLength;
+        private float _halfWidth;
+        private Vector3 _contactNormal;
+        private float _lastSpeed;
+        private bool _hasLastSpeed;
+        private float _longAccel;
+        private float _latAccel;
+
         private Rigidbody _carrier;
         private Vector3 _carrierAngularVelocity;
 
@@ -48,7 +74,16 @@ namespace PlayableVehicles
             Brake = 0f;
             _carrier = null;
             _carrierAngularVelocity = Vector3.zero;
+            _contactNormal = Vector3.zero;
+            _hasLastSpeed = false;
+            _longAccel = 0f;
+            _latAccel = 0f;
             if (!Available || vehicle == null || rb == null) return false;
+
+            UnitDefinition definition = vehicle.definition;
+            float fallbackHalf = Mathf.Max(vehicle.maxRadius * 0.5f, 1f);
+            _halfLength = definition != null && definition.length > 0.5f ? definition.length * 0.4f : fallbackHalf;
+            _halfWidth = definition != null && definition.width > 0.5f ? definition.width * 0.4f : fallbackHalf * 0.6f;
 
             _acceleration = GameAccess.GroundVehicleAcceleration(vehicle);
             _topSpeedOnroad = GameAccess.GroundVehicleTopSpeedOnroad(vehicle);
@@ -64,6 +99,7 @@ namespace PlayableVehicles
         }
 
         public float Mass => _mass;
+        public float FrictionCoef => _frictionCoef;
 
         public void InitTowed(GroundVehicle vehicle, Rigidbody rb, float standingHeight)
         {
@@ -130,8 +166,13 @@ namespace PlayableVehicles
             Speed = Vector3.Dot(velocity, forward);
             float alt = surface.Raycast(new Ray(position, down), out float distance) ? Mathf.Max(distance, 0f) : 100f;
             RadarAlt = Mathf.Max(alt - _spawnOffset, 0f);
+            TrackAcceleration(up, carrierAngularVelocity);
             AntiRollover();
-            if (alt > _suspensionTravel * 2f) return;
+            if (alt > _suspensionTravel * 2f)
+            {
+                _contactNormal = Vector3.zero;
+                return;
+            }
             Grounded = true;
 
             float engineThrottle = throttle;
@@ -159,6 +200,11 @@ namespace PlayableVehicles
             {
                 steering *= Mathf.Clamp01(Mathf.Abs(Speed) / ModConfig.FullSteeringSpeed.Value) * (Speed < -ReverseBrakeSpeed ? -1f : 1f);
             }
+            if (!_towed && Mathf.Abs(Speed) > 1f)
+            {
+                float gripSteering = 0.5f * GripSteeringMargin * _frictionCoef * Physics.gravity.magnitude / Mathf.Abs(Speed);
+                steering = Mathf.Clamp(steering, -gripSteering, gripSteering);
+            }
 
             float topSpeed = Speed < 0f && throttle < 0f ? TopSpeed * ModConfig.ReverseSpeedFactor.Value : TopSpeed;
             if (!_towed && Mathf.Abs(Speed) > topSpeed)
@@ -175,11 +221,29 @@ namespace PlayableVehicles
             float support2 = spring + damping;
             Vector3 suspension = normal * support2;
 
-            Vector3 levelTorque = 1.5f * -Vector3.Cross(normal, up) - 0.1f * (_rb.angularVelocity - carrierAngularVelocity);
+            Vector3 level = WeightTransfer(ContactNormal(position, up, forward, t.right, normal), forward, t.right);
+            Vector3 levelTorque = 1.5f * -Vector3.Cross(level, up) - 0.1f * (_rb.angularVelocity - carrierAngularVelocity);
             Vector3 side = Vector3.Cross(forward, normal);
-            Vector3 resist = new Vector3(-suspension.x, 0f, -suspension.z) - velocity * _mass * 10f;
-            Vector3 lateral = Vector3.Project(-velocity * 10f + resist, side);
-            Vector3 braking = (-velocity * 10f + resist) * brake;
+            Vector3 lateral;
+            Vector3 braking;
+            float gripFriction = _frictionCoef;
+            if (_towed)
+            {
+                gripFriction = Mathf.Min(_frictionCoef, TowedGripFriction);
+                float limit = support2 * gripFriction;
+                Vector3 fwdPlane = Vector3.ProjectOnPlane(forward, normal);
+                Vector3 sidePlane = Vector3.Cross(fwdPlane, normal);
+                float vLat = Vector3.Dot(velocity, sidePlane);
+                float vLong = Vector3.Dot(velocity, fwdPlane);
+                lateral = sidePlane * (-limit * GroundProbe.Tanh(vLat / TowedLatSlip));
+                braking = fwdPlane * (-brake * limit * GroundProbe.Tanh(vLong / TowedLongSlip));
+            }
+            else
+            {
+                Vector3 resist = new Vector3(-suspension.x, 0f, -suspension.z) - velocity * _mass * 10f;
+                lateral = Vector3.Project(-velocity * 10f + resist, side);
+                braking = (-velocity * 10f + resist) * brake;
+            }
 
             Vector3 drive = Vector3.zero;
             if (Mathf.Abs(Speed) < topSpeed)
@@ -193,7 +257,7 @@ namespace PlayableVehicles
                 rolling = new Vector3(Mathf.Sign(-velocity.x) - velocity.x * 0.05f, Mathf.Sign(-velocity.y) - velocity.y * 0.05f,
                     Mathf.Sign(-velocity.z) - velocity.z * 0.05f) * (0.05f * support2);
             }
-            Vector3 grip = Vector3.ClampMagnitude(lateral + braking + rolling, support2 * _frictionCoef) + drive;
+            Vector3 grip = Vector3.ClampMagnitude(lateral + braking + rolling, support2 * gripFriction) + drive;
 
             _rb.AddForce(suspension + grip);
             _rb.AddTorque(steering * 0.2f * up + levelTorque, ForceMode.VelocityChange);
@@ -201,8 +265,13 @@ namespace PlayableVehicles
 
         private bool SampleGround(Vector3 position, Vector3 down, out RaycastHit ground)
         {
+            return CastGround(position, down, _suspensionTravel * 3f, out ground);
+        }
+
+        private bool CastGround(Vector3 origin, Vector3 direction, float distance, out RaycastHit ground)
+        {
             ground = default;
-            int count = Physics.RaycastNonAlloc(position, down, _groundHits, _suspensionTravel * 3f,
+            int count = Physics.RaycastNonAlloc(origin, direction, _groundHits, distance,
                 ~PhysicsLayers.ExclusionZonesMask, QueryTriggerInteraction.UseGlobal);
             Transform own = _vehicle.transform;
             float nearest = float.MaxValue;
@@ -217,6 +286,69 @@ namespace PlayableVehicles
                 found = true;
             }
             return found;
+        }
+
+        private Vector3 ContactNormal(Vector3 position, Vector3 up, Vector3 forward, Vector3 right, Vector3 centerNormal)
+        {
+            float startAbove = ContactStartMargin + _halfLength * 0.6f;
+            float distance = startAbove + _suspensionTravel * 3f;
+            int hits = 0;
+            int missing = -1;
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 corner = position + forward * (i < 2 ? _halfLength : -_halfLength) + right * ((i & 1) == 0 ? -_halfWidth : _halfWidth);
+                if (CastGround(corner + up * startAbove, -up, distance, out RaycastHit hit) && hit.distance > ContactStartMargin)
+                {
+                    _cornerPoints[i] = hit.point;
+                    hits++;
+                }
+                else
+                {
+                    missing = i;
+                }
+            }
+
+            Vector3 target = centerNormal;
+            if (hits == 4)
+            {
+                target = Vector3.Cross(_cornerPoints[0] - _cornerPoints[3], _cornerPoints[1] - _cornerPoints[2]);
+            }
+            else if (hits == 3)
+            {
+                Vector3 a = _cornerPoints[missing == 0 ? 1 : 0];
+                Vector3 b = _cornerPoints[missing <= 1 ? 2 : 1];
+                Vector3 c = _cornerPoints[missing == 3 ? 2 : 3];
+                target = Vector3.Cross(b - a, c - a);
+            }
+            if (Vector3.Dot(target, up) < 0f) target = -target;
+            target = target.sqrMagnitude > 1e-6f ? target.normalized : centerNormal;
+            target = Vector3.RotateTowards(centerNormal, target, ContactTiltLimit * Mathf.Deg2Rad, 0f);
+
+            _contactNormal = _contactNormal == Vector3.zero ? target
+                : Vector3.Slerp(_contactNormal, target, 1f - Mathf.Exp(-Time.fixedDeltaTime / ContactNormalSmoothing));
+            return _contactNormal;
+        }
+
+        private void TrackAcceleration(Vector3 up, Vector3 carrierAngularVelocity)
+        {
+            float dt = Time.fixedDeltaTime;
+            float longAccel = _hasLastSpeed && dt > 0f ? (Speed - _lastSpeed) / dt : 0f;
+            _lastSpeed = Speed;
+            _hasLastSpeed = true;
+            float latAccel = Speed * Vector3.Dot(_rb.angularVelocity - carrierAngularVelocity, up);
+
+            float k = dt > 0f ? 1f - Mathf.Exp(-dt / AccelSmoothing) : 1f;
+            _longAccel = Mathf.Lerp(_longAccel, Mathf.Clamp(longAccel, -MaxTrackedAccel, MaxTrackedAccel), k);
+            _latAccel = Mathf.Lerp(_latAccel, Mathf.Clamp(latAccel, -MaxTrackedAccel, MaxTrackedAccel), k);
+        }
+
+        private Vector3 WeightTransfer(Vector3 level, Vector3 forward, Vector3 right)
+        {
+            if (_towed) return level;
+            float factor = _tracked ? TrackedWeightFactor : 1f;
+            float pitch = Mathf.Clamp(-_longAccel * PitchPerAccel * factor, -MaxPitch, MaxPitch);
+            float roll = Mathf.Clamp(_latAccel * RollPerAccel * factor, -MaxRoll, MaxRoll);
+            return Quaternion.AngleAxis(pitch, right) * Quaternion.AngleAxis(roll, forward) * level;
         }
 
         private bool IsCarrier(Rigidbody body, Collider collider)

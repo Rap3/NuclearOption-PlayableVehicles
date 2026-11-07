@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Rewired;
 using UnityEngine;
 
@@ -16,6 +17,7 @@ namespace PlayableVehicles
         public const string FreeLook = "Free Look";
         public const string MoveLongitudinal = "Move Longitudinal";
         public const string MoveLateral = "Move Lateral";
+        public const string Throttle = "Throttle";
     }
 
     internal static class InputGate
@@ -26,7 +28,8 @@ namespace PlayableVehicles
             || CursorManager.GetFlag(CursorFlags.Chat | CursorFlags.Dialogue);
 
         public static bool GameplayInputAllowed => !PauseMenuOpen && !DynamicMap.mapMaximized && !TextInputActive
-            && !VanillaWindow.AnyOpen && !VehicleSelectionMenu.IsOpen;
+            && !VanillaWindow.AnyOpen && !VehicleSelectionMenu.IsOpen
+            ;
 
         public static bool MouseLookAllowed => GameplayInputAllowed && !Cursor.visible;
 
@@ -73,6 +76,26 @@ namespace PlayableVehicles
             return (KeyHeld(positive) ? 1f : 0f) - (KeyHeld(negative) ? 1f : 0f);
         }
 
+        private static int _mapsFrame = -1;
+        private static readonly Dictionary<int, IEnumerable<ActionElementMap>> _mapsCache = new Dictionary<int, IEnumerable<ActionElementMap>>();
+
+        private static IEnumerable<ActionElementMap> MapsFor(Player player, Joystick joystick, string action)
+        {
+            int frame = Time.frameCount;
+            if (frame != _mapsFrame)
+            {
+                _mapsFrame = frame;
+                _mapsCache.Clear();
+            }
+            int key = joystick.id * 1024 + action.GetHashCode();
+            if (!_mapsCache.TryGetValue(key, out IEnumerable<ActionElementMap> maps))
+            {
+                maps = player.controllers.maps.ElementMapsWithAction(ControllerType.Joystick, joystick.id, action, true);
+                _mapsCache[key] = maps;
+            }
+            return maps;
+        }
+
         public static float JoystickAxis(string action, float deadZone)
         {
             if (TextInputActive) return 0f;
@@ -84,7 +107,7 @@ namespace PlayableVehicles
                 foreach (Joystick joystick in player.controllers.Joysticks)
                 {
                     if (joystick == null || !joystick.enabled) continue;
-                    foreach (ActionElementMap map in player.controllers.maps.ElementMapsWithAction(ControllerType.Joystick, joystick.id, action, true))
+                    foreach (ActionElementMap map in MapsFor(player, joystick, action))
                     {
                         float element = ElementValue(joystick, map);
                         if (Mathf.Abs(element) > Mathf.Abs(value)) value = element;
@@ -100,6 +123,31 @@ namespace PlayableVehicles
         }
 
         private static readonly ErrorThrottle JoystickErrors = new ErrorThrottle("InputGate.JoystickAxis");
+
+        public static bool JoystickButtonDown(string action, bool negative = false)
+        {
+            if (TextInputActive) return false;
+            Player player = GameManager.playerInput;
+            if (player == null || !ReInput.isReady) return false;
+            try
+            {
+                foreach (Joystick joystick in player.controllers.Joysticks)
+                {
+                    if (joystick == null || !joystick.enabled) continue;
+                    foreach (ActionElementMap map in MapsFor(player, joystick, action))
+                    {
+                        if (map.elementType != ControllerElementType.Button) continue;
+                        if ((map.axisContribution == Pole.Negative) != negative) continue;
+                        if (joystick.GetButtonDown(map.elementIndex)) return true;
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                JoystickErrors.Report(e);
+            }
+            return false;
+        }
 
         private static float ElementValue(Joystick joystick, ActionElementMap map)
         {

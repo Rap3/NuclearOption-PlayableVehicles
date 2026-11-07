@@ -1,5 +1,59 @@
 # Changelog
 
+Versioning follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH` + pre-release suffix
+(`-beta`). MAJOR — breaking changes (multiplayer protocol incompatible with older builds), MINOR — new
+features backwards-compatible, PATCH — bug fixes only. Pre-release suffix marks unreleased development.
+
+## 1.1.0-beta (unreleased)
+
+- **Own running gear for vehicles:** wheels and road wheels with suspension (progressive bump stop, separate bump
+  and rebound damping, anti-roll bars), tyre grip by surface, Ackermann steering, tracks with pivot turns, engine
+  and gearbox from real prototypes. Realistic cannon recoil.
+- **New ground camera**, armour zones and internal modules, instant cannon shots for client drivers.
+- **Weapon wheel and radial menu in vehicles**, the game's own: hold Weapon Wheel to pick a weapon station (with
+  ammo), hold Radial Menu for vehicle actions — exit, deploy / stow (hitch, load), fire control computer, night
+  vision. Works with a gamepad, mouse or keys, as set in the game's options.
+- **Drive vehicle** in the aircraft radial menu: gets you into the selected vehicle or opens your depot's menu, like F7.
+- **Gamepad in the vehicle purchase menu:** left stick picks a vehicle, LB / RB switch tabs, X switches to the next
+  depot, A deploys and confirms, B goes back (the game's default gamepad bindings for Move, Throttle, Target Select,
+  Fire and Target Cancel).
+- **Clearer barrel marker** (where the shell will land): yellow with "BLOCKED 340m" when a hill, tree or building is
+  in the way, red with "OUT OF REACH" when the shell won't get there, and the distance to the impact point when you
+  aim at the sky.
+- **Projectile camera (V):** press once to arm — the next shell, bullet or missile fired from your vehicle takes the
+  camera (the first round of a burst), press again to cancel. Shells aren't game objects, so the camera flies the
+  same ballistic model the game simulates; missiles are followed for real. The camera returns to the vehicle when the
+  projectile's flight ends. While watching, firing and turret aiming by the camera are suppressed; the vehicle HUD
+  hides (only a small hint panel with the exit key and missile warnings stay). The camera rides right behind the
+  projectile with the view locked to the trajectory (free look is disabled while watching).
+- Fixed: while you drove a vehicle, the radial menu still worked on your parked aircraft, so it could eject the
+  pilot or shut down the engine.
+- **Towing trailers fixed.** Trailers now ride on the same per-wheel suspension and tyre physics as driven wheeled
+  vehicles, with a low centre of mass, instead of a single plane under the chassis — no more swaying, tipping over
+  or pushing the tractor sideways (jackknifing). The hitch is a damped spring coupling like a real tow ball instead
+  of a rigid joint, so trailer tug is absorbed rather than thrown at the tractor. Support legs fold away while the
+  trailer is hitched and come back out on unhitching, and trailers can be hitched on factory ramps instead of only
+  on perfectly flat ground.
+- Fixed: in Free Flight no vehicles could be bought at all. Those missions disable faction donations, and the shop
+  treated that as "purchasing disabled", while the game's own aircraft requisition at airbases ignores that flag.
+  Buying at your own airbases now follows the aircraft rules; the donation restriction still applies to vehicle
+  depots, like the vanilla convoy button.
+- Fixed: loaded containers and towed trailers stayed combat-ready — the launcher kept tracking and firing through
+  the truck bed and the radar kept spinning its antenna. Cargo and the hitch now stow the load's weapons and radar
+  (like a helicopter sling load) and un-stow them when it deploys after unloading / unhitching. The launcher is
+  raised back to its firing pose, so a towed SAM trailer no longer stays folded and shoots into the ground.
+  Synced to all players in multiplayer.
+- **Fifth-wheel hitching.** Trailers now sit on a saddle over the tractor's rear axle like a real semi (was: tow ball
+  at the bumper), so the trailer rests on the tractor instead of pushing it sideways.
+- **Multiplayer protocol 10: the host and everyone who drives must update together.** The host now steers
+  client-driven vehicles' barrels parallel to the driver's camera ray (stabilizer-style aiming), same as the local
+  driver - before, remote clients' barrels chased the terrain point and visibly lagged behind the crosshair when
+  driving. Server-side rate limits on driver input, deploy, towing and purchase requests, mirroring the game's own
+  RPC rate limiting. The stowed state of loaded containers and towed trailers is synced to all players.
+- **Host controls:** a master switch `[Server] Enabled` turns all vehicle features off (no entering, buying or
+  selling, the GROUND spawn mode is hidden), and `VehicleAccess` now defaults to `OwnVehicles` — players drive the
+  vehicles they bought; the host sets `Open` to allow any faction vehicle.
+
 ## 1.0.3
 
 - **Multiplayer protocol 6: the host and everyone who drives must update together.**

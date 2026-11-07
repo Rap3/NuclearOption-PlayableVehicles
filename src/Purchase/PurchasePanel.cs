@@ -78,7 +78,7 @@ namespace PlayableVehicles
             }
 
             float funds = player.Allocation;
-            bool allowed = !player.HQ.preventDonation;
+            bool allowed = !player.HQ.preventDonation || (_point != null && _point.IsAirbase);
 
             foreach (Entry entry in _entries)
             {

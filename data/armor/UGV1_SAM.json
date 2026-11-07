@@ -1,0 +1,193 @@
+{
+  "prefab": "UGV1_SAM",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "ugv",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "path": "traverse/barrel",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "regions": [],
+  "modules": [
+    {
+      "id": "control",
+      "kind": "radar",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.05,
+        0.7
+      ],
+      "size": [
+        0.6,
+        0.3,
+        0.6
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.2,
+        -0.6
+      ],
+      "size": [
+        0.8,
+        0.35,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "sam_launcher",
+      "kind": "launcher",
+      "part": "traverse/barrel",
+      "center": [
+        -0.0,
+        0.06,
+        0.096
+      ],
+      "size": [
+        1.505,
+        0.293,
+        1.744
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -0.62,
+        -0.444,
+        0.789
+      ],
+      "size": [
+        0.5,
+        0.648,
+        0.648
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        0.62,
+        -0.444,
+        0.789
+      ],
+      "size": [
+        0.5,
+        0.648,
+        0.648
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -0.62,
+        -0.445,
+        0.069
+      ],
+      "size": [
+        0.5,
+        0.648,
+        0.648
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        0.62,
+        -0.445,
+        0.069
+      ],
+      "size": [
+        0.5,
+        0.648,
+        0.648
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -0.62,
+        -0.445,
+        -0.643
+      ],
+      "size": [
+        0.5,
+        0.648,
+        0.648
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        0.62,
+        -0.445,
+        -0.643
+      ],
+      "size": [
+        0.5,
+        0.648,
+        0.648
+      ],
+      "external": true,
+      "link": ""
+    }
+  ]
+}

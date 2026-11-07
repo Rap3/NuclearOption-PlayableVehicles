@@ -7,7 +7,6 @@ namespace PlayableVehicles
         private const float MinPivotHeight = 2.8f;
         private const float RoofClearance = 1.2f;
         private const float DefaultPitch = 6f;
-        private float _pivotHeight = MinPivotHeight;
         private const float MinDistance = 3.5f;
         private const float MaxPitch = 85f;
         private const float MinCollisionDistance = 0.8f;
@@ -16,6 +15,10 @@ namespace PlayableVehicles
         private const float LoweredPivotClearance = 0.6f;
         private const float PivotDropSpeed = 14f;
         private const float ZoomSensitivityMultiplier = 0.12f;
+        private const float TauIncDecay = 0.4f;
+        private const float RecoilMaxDegrees = 15f;
+        private const float ProjectileDistance = 0.25f;
+        private const float ProjectileLookTau = 0.06f;
 
         private GroundVehicle _vehicle;
         private Rigidbody _rb;
@@ -24,30 +27,39 @@ namespace PlayableVehicles
         private float _yaw;
         private float _pitch = DefaultPitch;
         private float _targetDistance;
-        private float _currentDistance;
         private float _defaultFov = 60f;
         private float _zoomSpeed;
         private float _bodyRadius = 3f;
         private Bounds _hullBounds;
         private float _pivotDrop;
 
+        private float _distanceMult = 1f;
+        private Vector3 _pivotSmooth;
+        private bool _hasPivot;
+        private Vector3 _aimOrigin;
+        private bool _hasAimOrigin;
+        private Vector3 _datum;
+        private float _tauInc;
+        private Vector3 _lookDir = Vector3.forward;
+        private bool _hasLook;
+        private bool _wasZoomed;
+        private float _magnification = 1f;
+        private float _fovSmooth = 60f;
+        private float _trauma;
+        private float _shakeTime;
+        private Vector3 _recoil;
+        private Vector3 _recoilVel;
+        private Vector3 _recoilImpulse;
+        private bool _projectileMode;
+
+        private int[] _ammo = new int[0];
+
         public bool IsZoomed { get; private set; }
 
         public Ray AimRay { get; private set; }
         public bool HasAimRay { get; private set; }
 
-        private const float LowShakeDegrees = 1.6f;
-        private const float HighShakeDegrees = 0.5f;
-        private float _lowShake;
-        private float _highShake;
-        private int[] _ammo = new int[0];
-
-        private const float VerticalLagTime = 0.1f;
-        private const float MaxVerticalLag = 0.6f;
-        private float _verticalLag;
-        private float _verticalLagVelocity;
-        private float _lastPivotY;
-        private bool _hasLastPivot;
+        public Camera CurrentCamera => _cam;
 
         public static Ray ViewRay(Camera camera)
         {
@@ -58,13 +70,12 @@ namespace PlayableVehicles
 
         public void AddShake(float lowFreqShake, float highFreqShake)
         {
-            float scale = ModConfig.ShakeScale.Value;
-            _lowShake = Mathf.Min(_lowShake + lowFreqShake * scale, 1f);
-            _highShake = Mathf.Min(_highShake + highFreqShake * scale, 1f);
+            float add = Mathf.Max(lowFreqShake, highFreqShake) * ModConfig.ShakeScale.Value;
+            if (add <= 0f) return;
+            _trauma = Mathf.Clamp01(_trauma + add);
         }
 
         private float MinThirdPersonDistance => Mathf.Max(MinDistance, _bodyRadius + 2f);
-        public Camera CurrentCamera => _cam;
 
         public void Attach(GroundVehicle vehicle)
         {
@@ -85,20 +96,53 @@ namespace PlayableVehicles
             hull.Expand(HullMargin * 2f);
             _hullBounds = hull;
             _pivotDrop = 0f;
+            _hasAimOrigin = false;
             _targetDistance = Mathf.Max(ModConfig.CameraDistance.Value, MinThirdPersonDistance);
-            _currentDistance = _targetDistance;
 
             _yaw = vehicle.transform.eulerAngles.y;
             _pitch = DefaultPitch;
             IsZoomed = false;
             _zoomSpeed = 0f;
-            _lowShake = _highShake = 0f;
-            _verticalLag = _verticalLagVelocity = 0f;
-            _pivotDrop = 0f;
-            _hasLastPivot = false;
+            _distanceMult = 1f;
+            _hasPivot = false;
+            _hasLook = false;
+            _pivotSmooth = Vector3.zero;
+            _datum = Datum.originPosition;
+            _tauInc = 0f;
+            _wasZoomed = false;
+            _magnification = 1f;
+            _fovSmooth = _defaultFov;
+            _trauma = 0f;
+            _shakeTime = 0f;
+            _recoil = Vector3.zero;
+            _recoilVel = Vector3.zero;
+            _recoilImpulse = Vector3.zero;
+            _projectileMode = false;
             HasAimRay = false;
             RememberAmmo();
         }
+
+        public void ProjectileStarted(Vector3 initialVelocity)
+        {
+            _projectileMode = true;
+            _hasPivot = false;
+            _hasAimOrigin = false;
+            if (initialVelocity.sqrMagnitude < 1f) return;
+            Vector3 euler = Quaternion.LookRotation(initialVelocity.normalized, Vector3.up).eulerAngles;
+            _yaw = euler.y;
+            _pitch = euler.x > 180f ? euler.x - 360f : euler.x;
+            _hasLook = false;
+        }
+
+        public void ProjectileEnded()
+        {
+            if (!_projectileMode) return;
+            _projectileMode = false;
+            _hasPivot = false;
+            _hasAimOrigin = false;
+        }
+
+        private float _pivotHeight = MinPivotHeight;
 
         public void Detach()
         {
@@ -130,92 +174,226 @@ namespace PlayableVehicles
                 if (_cam == null) return;
             }
 
-            if (InputGate.MouseLookAllowed)
-            {
-                ReadMouse();
-            }
-
-            float targetFov = IsZoomed ? ModConfig.ZoomFov.Value : _defaultFov;
-            _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, targetFov, Time.deltaTime * 16f);
-
-            Transform vt = _vehicle.transform;
-            Vector3 pivot = (_rb != null ? vt.TransformPoint(_rb.centerOfMass) : vt.position) + Vector3.up * _pivotHeight;
-            if (!IsZoomed) pivot.y += VerticalLag(pivot.y);
+            if (InputGate.MouseLookAllowed && !VehicleRadialMenu.IsOpen) ReadMouse();
             WatchFire();
 
-            Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
-            Vector3 desiredDir = rotation * -Vector3.forward;
+            float dt = Mathf.Max(Time.deltaTime, 1e-4f);
+            FollowOriginShift();
 
-            float actualDistance = IsZoomed ? -(_bodyRadius + 0.5f) : _targetDistance;
-
-            float targetDrop = 0f;
-            if (!IsZoomed && TryFindObstacle(pivot, desiredDir, actualDistance, out float obstacle))
+            bool projectile = false;
+            Vector3 projectilePos = default;
+            Vector3 projectileVel = default;
+            if (_projectileMode)
             {
-                float limited = Mathf.Clamp(obstacle - 0.2f, MinCollisionDistance, actualDistance);
-                if (!InsideHull(vt, pivot + desiredDir * limited))
+                projectile = ProjectileCam.TryUpdate(dt, out projectilePos, out projectileVel);
+                if (!projectile) _projectileMode = false;
+            }
+
+            Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+            Vector3 wishDir = rotation * Vector3.forward;
+            if (projectile && projectileVel.sqrMagnitude > 1f)
+            {
+                wishDir = projectileVel.normalized;
+                Vector3 euler = Quaternion.LookRotation(wishDir, Vector3.up).eulerAngles;
+                _yaw = euler.y;
+                _pitch = euler.x > 180f ? euler.x - 360f : euler.x;
+            }
+            if (!_hasLook)
+            {
+                _lookDir = wishDir;
+                _hasLook = true;
+            }
+            float lookTau = projectile
+                ? ProjectileLookTau
+                : Mathf.Max(ModConfig.CameraLookTau.Value + _tauInc, 1e-4f);
+            _lookDir = Approach(_lookDir, wishDir, lookTau, dt).normalized;
+            Vector3 forward = _lookDir;
+            Quaternion lookRotation = Quaternion.LookRotation(forward, Vector3.up);
+            Vector3 stableUp = Vector3.up;
+            Vector3 right = Vector3.Cross(stableUp, forward);
+            if (right.sqrMagnitude < 1e-6f) right = rotation * Vector3.right;
+            right.Normalize();
+            Vector3 up = Vector3.Cross(forward, right).normalized;
+
+            Transform vt = _vehicle.transform;
+            Vector3 pivotNow = projectile
+                ? projectilePos
+                : (_rb != null ? vt.TransformPoint(_rb.centerOfMass) : vt.position) + Vector3.up * _pivotHeight;
+            if (!_hasPivot)
+            {
+                _pivotSmooth = pivotNow;
+                _hasPivot = true;
+            }
+            _pivotSmooth = Approach(_pivotSmooth, pivotNow, ModConfig.CameraTau.Value, dt);
+            Vector3 pivot = _pivotSmooth;
+
+            if (IsZoomed != _wasZoomed)
+            {
+                _tauInc = Mathf.Max(_tauInc, ModConfig.CameraZoomTauInc.Value);
+                _wasZoomed = IsZoomed;
+            }
+            float zoomFov = Mathf.Clamp(ModConfig.ZoomFov.Value, 1f, _defaultFov - 1f);
+            _fovSmooth = Approach(_fovSmooth, IsZoomed ? zoomFov : _defaultFov, ModConfig.CameraZoomTau.Value, dt);
+            _cam.fieldOfView = _fovSmooth;
+            _magnification = Mathf.Tan(_defaultFov * Mathf.Deg2Rad * 0.5f) / Mathf.Max(Mathf.Tan(_fovSmooth * Mathf.Deg2Rad * 0.5f), 1e-4f);
+
+            float distance = IsZoomed
+                ? -(_bodyRadius + 0.5f)
+                : projectile
+                    ? ProjectileDistance
+                    : _targetDistance * Mathf.Max(ModConfig.VehicleOffsetMultiplier.Value, 0.1f);
+            Vector3 cameraOffset = -forward * distance;
+            Vector3 pivotOffset = up * 0.25f;
+            float wishMult = 1f;
+            if (!IsZoomed && distance > 0.01f && !projectile)
+            {
+                float radius = ModConfig.CameraCollisionRadius.Value;
+                if (SphereHit(pivot, pivot + pivotOffset, radius, out float pivotAlong))
+                    pivotOffset = pivotOffset.normalized * Mathf.Max(pivotAlong - radius, 0f);
+                Vector3 armStart = pivot + pivotOffset;
+                if (SphereHit(armStart, armStart + cameraOffset, radius, out float hitAlong))
                 {
-                    _currentDistance = limited;
+                    float usable = Mathf.Max(hitAlong - radius, 0f);
+                    wishMult = Mathf.Clamp01(usable / Mathf.Max(cameraOffset.magnitude, 1e-4f));
+                }
+            }
+            float multSpeed = wishMult > _distanceMult ? ModConfig.CameraMoveOutSpeed.Value : ModConfig.CameraMoveInSpeed.Value;
+            _distanceMult = MoveTo(_distanceMult, wishMult, multSpeed, dt);
+            Vector3 wishPos = pivot + pivotOffset + cameraOffset * _distanceMult;
+
+            if (!projectile && !IsZoomed && InsideHull(vt, wishPos))
+            {
+                Vector3 loweredPivot = pivot;
+                loweredPivot.y = Mathf.Min(pivot.y,
+                    vt.TransformPoint(new Vector3(0f, _hullBounds.max.y - HullMargin, 0f)).y + LoweredPivotClearance);
+                float drop = pivot.y - loweredPivot.y;
+                if (drop > 0.05f)
+                {
+                    Vector3 lowered = loweredPivot + cameraOffset * _distanceMult;
+                    if (!InsideHull(vt, lowered))
+                    {
+                        _pivotDrop = Mathf.Lerp(_pivotDrop, drop, 1f - Mathf.Exp(-PivotDropSpeed * dt));
+                        wishPos = lowered;
+                    }
+                    else
+                    {
+                        wishPos = pivot + cameraOffset * (MinCollisionDistance / Mathf.Max(distance, 0.01f));
+                    }
                 }
                 else
                 {
-                    Vector3 lowered = pivot;
-                    lowered.y = Mathf.Min(pivot.y, vt.TransformPoint(new Vector3(0f, _hullBounds.max.y - HullMargin, 0f)).y + LoweredPivotClearance);
-                    bool resolved = false;
-                    if (lowered.y < pivot.y - 0.05f)
-                    {
-                        float loweredDistance = TryFindObstacle(lowered, desiredDir, actualDistance, out float loweredObstacle)
-                            ? Mathf.Clamp(loweredObstacle - 0.2f, MinCollisionDistance, actualDistance)
-                            : actualDistance;
-                        if (!InsideHull(vt, lowered + desiredDir * loweredDistance))
-                        {
-                            targetDrop = pivot.y - lowered.y;
-                            _currentDistance = loweredDistance;
-                            resolved = true;
-                        }
-                    }
-                    if (!resolved) _currentDistance = Mathf.Lerp(_currentDistance, actualDistance, Time.deltaTime * 14f);
+                    wishPos = pivot + cameraOffset * (MinCollisionDistance / Mathf.Max(distance, 0.01f));
                 }
             }
             else
             {
-                _currentDistance = Mathf.Lerp(_currentDistance, actualDistance, Time.deltaTime * 14f);
+                _pivotDrop = Mathf.Lerp(_pivotDrop, 0f, 1f - Mathf.Exp(-PivotDropSpeed * dt));
             }
+            wishPos.y -= _pivotDrop;
+            wishPos = KeepAboveGround(wishPos);
 
-            _pivotDrop = Mathf.Lerp(_pivotDrop, targetDrop, 1f - Mathf.Exp(-PivotDropSpeed * Time.deltaTime));
-            if (_pivotDrop < 0.01f) _pivotDrop = 0f;
-            pivot.y -= _pivotDrop;
+            _tauInc = MoveTo(_tauInc, 0f, TauIncDecay, dt);
+            Vector3 position = wishPos;
 
-            Vector3 position = KeepAboveGround(pivot + desiredDir * _currentDistance);
-            AimRay = new Ray(position, rotation * Vector3.forward);
+            float shakeDeg = ModConfig.ShakeMaxDegrees.Value;
+            float shake = _trauma * _trauma;
+            Vector3 shakeAngles = Vector3.zero;
+            if (shake > 0.0001f)
+            {
+                float t = _shakeTime;
+                shakeAngles = new Vector3(
+                    2f * shakeDeg * shake * (Mathf.PerlinNoise1D(t) - 0.5f),
+                    2f * shakeDeg * shake * (Mathf.PerlinNoise1D(t + 1000f) - 0.5f),
+                    shakeDeg * shake * (Mathf.PerlinNoise1D(t + 2000f) - 0.5f));
+            }
+            _trauma = Mathf.Clamp01(_trauma - ModConfig.ShakeFadeout.Value * dt);
+            _shakeTime += ModConfig.ShakeSpeed.Value * dt;
+            if (_shakeTime > 1e5f) _shakeTime = 0f;
+
+            Vector3 recoilAngles = UpdateRecoil(dt);
+
+            if (!_hasAimOrigin)
+            {
+                _aimOrigin = position;
+                _hasAimOrigin = true;
+            }
+            _aimOrigin = Approach(_aimOrigin, position, ModConfig.CameraAimTau.Value, dt);
+            AimRay = new Ray(_aimOrigin, forward);
             HasAimRay = true;
-            ApplyPose(position, rotation * Shake());
+            float shakeScale = _defaultFov > 1f ? Mathf.Sqrt(Mathf.Clamp(_fovSmooth / _defaultFov, 0.01f, 1f)) : 1f;
+            ApplyPose(position, lookRotation * Quaternion.Euler((shakeAngles + recoilAngles * Mathf.Rad2Deg) * shakeScale));
         }
 
-        private float VerticalLag(float pivotY)
+        private Vector3 UpdateRecoil(float dt)
         {
-            float delta = _hasLastPivot ? pivotY - _lastPivotY : 0f;
-            _lastPivotY = pivotY;
-            _hasLastPivot = true;
-            if (Mathf.Abs(delta) > 5f) delta = 0f;
-            _verticalLag = Mathf.Clamp(_verticalLag - delta, -MaxVerticalLag, MaxVerticalLag);
-            _verticalLag = Mathf.SmoothDamp(_verticalLag, 0f, ref _verticalLagVelocity, VerticalLagTime, Mathf.Infinity, Time.deltaTime);
-            return _verticalLag;
+            float k = Mathf.Max(ModConfig.RecoilStiffness.Value, 1f);
+            float c = Mathf.Max(ModConfig.RecoilViscosity.Value, 0f);
+            _recoilVel += (-k * _recoil - c * _recoilVel) * dt;
+            _recoilVel += _recoilImpulse;
+            _recoilImpulse = Vector3.zero;
+            _recoil += _recoilVel * dt;
+            float maxRad = RecoilMaxDegrees * Mathf.Deg2Rad;
+            if (_recoil.sqrMagnitude > maxRad * maxRad)
+            {
+                _recoil = _recoil.normalized * maxRad;
+                _recoilVel = Vector3.zero;
+            }
+            return _recoil;
         }
 
-        private Quaternion Shake()
+        private static float Approach(float from, float to, float tau, float dt)
         {
-            float dt = Time.deltaTime;
-            _lowShake = Mathf.Lerp(_lowShake, 0f, 5f * dt);
-            _highShake = Mathf.Lerp(_highShake, 0f, 4f * dt);
-            float low = Mathf.Max(_lowShake - 0.01f, 0f) * LowShakeDegrees;
-            float high = Mathf.Max(_highShake - 0.05f, 0f) * HighShakeDegrees;
-            if (low <= 0f && high <= 0f) return Quaternion.identity;
-            float t = Time.timeSinceLevelLoad;
-            Vector3 lowNoise = new Vector3(Mathf.PerlinNoise1D(t * 16f) - 0.5f, Mathf.PerlinNoise1D(t * 13.333f) - 0.5f, Mathf.PerlinNoise1D(t * 9.686f) - 0.5f);
-            Vector3 highNoise = new Vector3(Mathf.PerlinNoise1D(t * 32f) - 0.5f, Mathf.PerlinNoise1D(t * 26.667f) - 0.5f, Mathf.PerlinNoise1D(t * 19.371f) - 0.5f);
-            Vector3 angles = 2f * (lowNoise * low + highNoise * high);
-            if (IsZoomed && _defaultFov > 0f) angles *= _cam.fieldOfView / _defaultFov;
-            return Quaternion.Euler(angles.x, angles.y, angles.z * 0.5f);
+            return Mathf.Lerp(from, to, 1f - Mathf.Exp(-dt / Mathf.Max(tau, 1e-4f)));
+        }
+
+        private void FollowOriginShift()
+        {
+            Vector3 datum = Datum.originPosition;
+            Vector3 shift = datum - _datum;
+            _datum = datum;
+            if (shift.sqrMagnitude < 1e-6f) return;
+            _pivotSmooth += shift;
+            _aimOrigin += shift;
+            ProjectileCam.FollowOriginShift(shift);
+        }
+
+        private static Vector3 Approach(Vector3 from, Vector3 to, float tau, float dt)
+        {
+            return Vector3.Lerp(from, to, 1f - Mathf.Exp(-dt / Mathf.Max(tau, 1e-4f)));
+        }
+
+        private static float MoveTo(float from, float to, float speed, float dt)
+        {
+            return Mathf.MoveTowards(from, to, Mathf.Max(speed, 0f) * dt);
+        }
+
+        private static readonly RaycastHit[] _obstacleHits = new RaycastHit[24];
+
+        private bool SphereHit(Vector3 from, Vector3 to, float radius, out float along)
+        {
+            along = float.MaxValue;
+            Vector3 delta = to - from;
+            float length = delta.magnitude;
+            if (length < 1e-4f) return false;
+            int count = Physics.SphereCastNonAlloc(from, radius, delta / length, _obstacleHits, length,
+                ~PhysicsLayers.ExclusionZonesMask, QueryTriggerInteraction.Ignore);
+            Transform own = _vehicle.transform;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = _obstacleHits[i];
+                Collider collider = hit.collider;
+                if (collider == null || collider.transform.IsChildOf(own)) continue;
+                Rigidbody body = collider.attachedRigidbody;
+                if (body != null && !body.isKinematic) continue;
+                if (hit.distance <= 0f) continue;
+                if (hit.distance < along) along = hit.distance;
+            }
+            return along < float.MaxValue;
+        }
+
+        private bool InsideHull(Transform vehicleTransform, Vector3 worldPoint)
+        {
+            return _hullBounds.Contains(vehicleTransform.InverseTransformPoint(worldPoint));
         }
 
         private void WatchFire()
@@ -249,50 +427,12 @@ namespace PlayableVehicles
                 float energy = 0.5f * Mathf.Max(info.massPerRound, 0f) * info.muzzleVelocity * info.muzzleVelocity;
                 strength = Mathf.Clamp(energy / 6e6f, 0.02f, 0.8f) * Mathf.Clamp01(info.fireInterval / 0.25f);
             }
-            strength *= Mathf.Min(shots, 4);
-            AddShake(strength, strength * 0.6f);
-        }
-
-        private bool InsideHull(Transform vehicleTransform, Vector3 worldPoint)
-        {
-            return _hullBounds.Contains(vehicleTransform.InverseTransformPoint(worldPoint));
-        }
-
-        private static readonly RaycastHit[] _obstacleHits = new RaycastHit[24];
-
-        private bool TryFindObstacle(Vector3 pivot, Vector3 direction, float distance, out float nearest)
-        {
-            nearest = NearestHit(pivot, direction, distance, out bool startsInside);
-            if (startsInside)
-            {
-                float back = NearestHit(pivot + direction * distance, -direction, distance, out _);
-                if (back < float.MaxValue) nearest = Mathf.Min(nearest, distance - back - 0.3f);
-            }
-            return nearest < float.MaxValue;
-        }
-
-        private float NearestHit(Vector3 origin, Vector3 direction, float distance, out bool startsInside)
-        {
-            startsInside = false;
-            float nearest = float.MaxValue;
-            int count = Physics.SphereCastNonAlloc(origin, 0.35f, direction, _obstacleHits, distance,
-                ~PhysicsLayers.ExclusionZonesMask, QueryTriggerInteraction.Ignore);
-            Transform own = _vehicle.transform;
-            for (int i = 0; i < count; i++)
-            {
-                RaycastHit hit = _obstacleHits[i];
-                Collider collider = hit.collider;
-                if (collider == null || collider.transform.IsChildOf(own)) continue;
-                Rigidbody body = collider.attachedRigidbody;
-                if (body != null && !body.isKinematic) continue;
-                if (hit.distance <= 0f)
-                {
-                    startsInside = true;
-                    continue;
-                }
-                if (hit.distance < nearest) nearest = hit.distance;
-            }
-            return nearest;
+            strength *= 1f + 0.35f * (Mathf.Min(shots, 6) - 1);
+            strength *= ModConfig.ShakeScale.Value;
+            if (strength <= 0f) return;
+            float omega = Mathf.Sqrt(Mathf.Max(ModConfig.RecoilStiffness.Value, 1f));
+            float peakRad = strength * ModConfig.RecoilImpulse.Value * Mathf.Deg2Rad;
+            _recoilImpulse += new Vector3(-peakRad * omega, 0f, 0f);
         }
 
         private void ReadMouse()

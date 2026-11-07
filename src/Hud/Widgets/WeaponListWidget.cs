@@ -77,7 +77,7 @@ namespace PlayableVehicles
             }
         }
 
-        private static Sprite IconOf(WeaponInfo info)
+        internal static Sprite IconOf(WeaponInfo info)
         {
             if (info.weaponIcon != null || !info.gun) return info.weaponIcon;
             if (!_gunIconSearched)

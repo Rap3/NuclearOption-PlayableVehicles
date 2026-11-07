@@ -1,0 +1,152 @@
+{
+  "prefab": "SAMTrailer1",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "trailer",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "path": "turret",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "path": "turret/missileLauncher",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "regions": [],
+  "modules": [
+    {
+      "id": "electronics",
+      "kind": "radar",
+      "part": "",
+      "center": [
+        -0.0,
+        0.2,
+        3.5
+      ],
+      "size": [
+        1.6,
+        1.0,
+        2.0
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "sam_launcher",
+      "kind": "launcher",
+      "part": "turret/missileLauncher",
+      "center": [
+        -0.002,
+        1.136,
+        2.753
+      ],
+      "size": [
+        2.597,
+        2.453,
+        5.869
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.05,
+        -1.347,
+        -2.146
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.05,
+        -1.347,
+        -2.146
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.05,
+        -1.347,
+        -3.69
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.05,
+        -1.347,
+        -3.69
+      ],
+      "size": [
+        0.5,
+        1.339,
+        1.333
+      ],
+      "external": true,
+      "link": ""
+    }
+  ]
+}

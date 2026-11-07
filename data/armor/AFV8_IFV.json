@@ -1,0 +1,433 @@
+{
+  "prefab": "AFV8_IFV",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "apc_wheeled_heavy",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        2.8,
+        1.3,
+        1.1,
+        0.6,
+        0.8
+      ]
+    },
+    {
+      "path": "turret",
+      "zones": [
+        2.8,
+        1.3,
+        1.1,
+        0.6,
+        1.0
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "glacis",
+      "part": "",
+      "zone": "roof",
+      "center": [
+        0.0,
+        0.55,
+        2.45
+      ],
+      "size": [
+        3.1,
+        0.9,
+        3.4
+      ],
+      "mult": 2.0,
+      "spall": 1.0,
+      "detonation": -1.0
+    }
+  ],
+  "modules": [
+    {
+      "id": "ammo",
+      "kind": "ammo",
+      "part": "turret",
+      "center": [
+        0.0,
+        -1.0,
+        -0.9
+      ],
+      "size": [
+        1.2,
+        0.6,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "atgm_launcher",
+      "kind": "launcher",
+      "part": "turret",
+      "center": [
+        -1.28,
+        0.18,
+        0.7
+      ],
+      "size": [
+        0.5,
+        0.5,
+        1.4
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "breech",
+      "kind": "gun",
+      "part": "turret",
+      "center": [
+        0.03,
+        0.2,
+        0.3
+      ],
+      "size": [
+        0.35,
+        0.35,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "commander",
+      "kind": "crew",
+      "part": "turret",
+      "center": [
+        -0.45,
+        -0.5,
+        -0.3
+      ],
+      "size": [
+        0.6,
+        1.0,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "commander_lower",
+      "kind": "crew",
+      "part": "turret",
+      "center": [
+        -0.45,
+        -1.4,
+        -0.3
+      ],
+      "size": [
+        0.6,
+        0.8,
+        0.7
+      ],
+      "external": false,
+      "link": "commander"
+    },
+    {
+      "id": "driver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        0.6,
+        -0.1,
+        2.4
+      ],
+      "size": [
+        0.65,
+        0.9,
+        1.0
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        -0.62,
+        -0.205,
+        2.255
+      ],
+      "size": [
+        1.18,
+        0.91,
+        1.71
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        0.95,
+        -0.44,
+        -3.14
+      ],
+      "size": [
+        0.36,
+        0.68,
+        0.88
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner",
+      "kind": "crew",
+      "part": "turret",
+      "center": [
+        0.45,
+        -0.6,
+        0.1
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner_lower",
+      "kind": "crew",
+      "part": "turret",
+      "center": [
+        0.45,
+        -1.4,
+        0.1
+      ],
+      "size": [
+        0.6,
+        0.8,
+        0.8
+      ],
+      "external": false,
+      "link": "gunner"
+    },
+    {
+      "id": "optics",
+      "kind": "optics",
+      "part": "turret",
+      "center": [
+        0.0,
+        0.6,
+        0.83
+      ],
+      "size": [
+        0.35,
+        0.3,
+        0.35
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "transmission",
+      "kind": "transmission",
+      "part": "",
+      "center": [
+        -0.65,
+        -0.6,
+        1.15
+      ],
+      "size": [
+        1.2,
+        0.5,
+        0.5
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_drive",
+      "kind": "turret_drive",
+      "part": "turret",
+      "center": [
+        0.8,
+        -0.35,
+        -0.6
+      ],
+      "size": [
+        0.4,
+        0.4,
+        0.4
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_ring",
+      "kind": "turret_ring",
+      "part": "",
+      "center": [
+        0.01,
+        0.95,
+        -1.36
+      ],
+      "size": [
+        2.0,
+        0.2,
+        2.0
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "wheel1_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.3,
+        -1.0,
+        2.51
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.3,
+        -1.0,
+        2.51
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.3,
+        -1.0,
+        1.09
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.3,
+        -1.0,
+        1.09
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.3,
+        -1.0,
+        -0.81
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.3,
+        -1.0,
+        -0.81
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel4_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.3,
+        -1.0,
+        -2.23
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel4_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.3,
+        -1.0,
+        -2.23
+      ],
+      "size": [
+        0.5,
+        1.2,
+        1.2
+      ],
+      "external": true,
+      "link": ""
+    }
+  ]
+}

@@ -48,6 +48,8 @@ namespace PlayableVehicles
 
         public Turret PrimaryTurret => _turrets.Count > 0 ? _turrets[0] : null;
         public int SelectedStationIndex { get; private set; }
+        public Vector3 AimRayDir => _aimRayDir;
+        public bool AimRayValid => _aimRayValid;
         public Vector3 CurrentAimPoint { get; private set; }
         public bool HasAimHit { get; private set; }
         public Vector3 TurretForward { get; private set; }
@@ -134,6 +136,9 @@ namespace PlayableVehicles
             _remoteFire = false;
             _remotePressesKnown = false;
             _pendingShots = 0;
+            _aimDirSmooth.Clear();
+            _aimDirCmd.Clear();
+            _aimRayValid = false;
 
             foreach (Turret turret in vehicle.GetComponentsInChildren<Turret>(true))
             {
@@ -170,6 +175,7 @@ namespace PlayableVehicles
         {
             _lock.Validate(_vehicle, !Silent);
             WeaponStation station = SelectedStation;
+            _lock.TargetAllowed = unit => !SamOnlyAir(_vehicle) || unit is Aircraft || unit is Missile;
             bool hasGun = Ballistics.TryGetGunProfile(station, StationBarrel(station), out GunProfile profile);
 
             UpdateSolutions(hasGun, profile);
@@ -188,6 +194,7 @@ namespace PlayableVehicles
                 if (PointDefence.Mark(turret, PointDefence.IsAutonomous(_vehicle, station, turret)) && PointDefence.RunsVanilla(turret)) continue;
 
                 bool stationTurret = station != null && station.Turrets != null && station.Turrets.Contains(turret);
+                if (VerticalLaunchVehicle(_vehicle)) continue;
                 if (mission && stationTurret && ArtillerySolver.IsArtillery(turret))
                 {
                     GameAccess.TurretAimTurret(turret, MissionSolution.Direction);
@@ -195,10 +202,37 @@ namespace PlayableVehicles
                     continue;
                 }
                 Vector3 target = stationTurret ? StationAimPoint : CurrentAimPoint;
-                GameAccess.TurretAimTurret(turret, target - turret.transform.position);
+                Vector3 aimDir = target - turret.transform.position;
+                if (!IsTracking && _aimRayValid)
+                {
+                    Vector3 corr = stationTurret && applyBallistics ? ballisticOffset : Vector3.zero;
+                    aimDir = _aimRayDir * aimDir.magnitude + corr;
+                }
+                if (_aimDirSmooth.TryGetValue(turret, out Vector3 prevDir))
+                {
+                    aimDir = Vector3.Lerp(prevDir, aimDir,
+                        1f - Mathf.Exp(-Time.fixedDeltaTime / TurretAimTau));
+                }
+                _aimDirSmooth[turret] = aimDir;
+                if (_aimDirCmd.TryGetValue(turret, out Vector3 lastCmd)
+                    && Vector3.Angle(aimDir, lastCmd) < TurretDeadzoneDegrees)
+                {
+                    aimDir = lastCmd;
+                }
+                else
+                {
+                    _aimDirCmd[turret] = aimDir;
+                }
+                GameAccess.TurretAimTurret(turret, aimDir);
 
                 if (i == 0) TurretForward = turret.transform.forward;
             }
+        }
+
+        private static bool SamOnlyAir(GroundVehicle vehicle)
+        {
+            VehicleDefinition def = vehicle != null ? vehicle.definition as VehicleDefinition : null;
+            return def != null && (def.vehicleType == VehicleType.R_SAM || def.vehicleType == VehicleType.IR_SAM);
         }
 
         private bool UpdateMission(WeaponStation station, bool hasGun, in GunProfile profile)
@@ -344,6 +378,15 @@ namespace PlayableVehicles
             return barrel != null ? barrel : turret.transform;
         }
 
+        private static bool VerticalLaunchVehicle(GroundVehicle vehicle)
+        {
+            if (vehicle == null) return false;
+            string name = vehicle.unitName;
+            return name == "MSV R9 Stratolance Launcher"
+                || name == "MSV Ballistic Missile Launcher"
+                || name == "MSV Nuclear Ballistic Missile Launcher";
+        }
+
         public void ReadLocalInput()
         {
             if (InputGate.ActionClicked(GameActions.NextWeapon)) SwitchWeapon(1);
@@ -351,6 +394,12 @@ namespace PlayableVehicles
             else if (InputGate.KeyDown(KeyCode.Alpha1)) SetWeaponSlot(0);
             else if (InputGate.KeyDown(KeyCode.Alpha2)) SetWeaponSlot(1);
             else if (InputGate.KeyDown(KeyCode.Alpha3)) SetWeaponSlot(2);
+
+            if (ProjectileCam.IsActive)
+            {
+                SetLocalFire(false);
+                return;
+            }
 
             UpdateAimPoint();
 
@@ -366,15 +415,21 @@ namespace PlayableVehicles
 
         private void SetLocalFire(bool held)
         {
-            if (held && !_fireHeld) FirePresses++;
+            if (held && !_fireHeld)
+            {
+                FirePresses++;
+                if (NetBridge.IsClientOnly) ProjectileCam.RecordClientPrediction(SelectedStation);
+            }
             _fireHeld = held;
         }
 
-        public void ApplyRemoteInput(Vector3 aimPoint, bool hasAimHit, int stationIndex, Unit lockTarget, bool fire, byte firePresses,
+        public void ApplyRemoteInput(Vector3 aimPoint, Vector3 aimDir, bool hasAimHit, int stationIndex, Unit lockTarget, bool fire, byte firePresses,
             Unit missionTarget, FireMode missionMode)
         {
             CurrentAimPoint = aimPoint;
             HasAimHit = hasAimHit;
+            _aimRayDir = aimDir.sqrMagnitude > 1e-4f ? aimDir.normalized : Vector3.forward;
+            _aimRayValid = true;
             SetWeaponSlot(stationIndex);
             _lock.Set(_vehicle, lockTarget);
             ApplyRemoteFire(fire, firePresses);
@@ -424,16 +479,34 @@ namespace PlayableVehicles
             if (mainCam == null) return;
 
             Ray ray = VehicleCamera.ViewRay(mainCam);
+            _aimRayDir = ray.direction;
+            _aimRayValid = true;
+            Vector3 target;
             if (AimRaycast.Cast(ray.origin, ray.direction, MaxAimDistance, _vehicle.transform, out RaycastHit hit))
             {
-                CurrentAimPoint = hit.point;
+                target = hit.point;
                 HasAimHit = true;
             }
             else
             {
-                CurrentAimPoint = ray.origin + ray.direction * NoHitAimDistance;
+                target = ray.origin + ray.direction * NoHitAimDistance;
                 HasAimHit = false;
             }
+
+            Vector3 datum = Datum.originPosition;
+            _aimPointSmooth += datum - _aimPointDatum;
+            _aimPointDatum = datum;
+            if (!_aimPointSmoothValid || (target - _aimPointSmooth).sqrMagnitude > 250000f)
+            {
+                _aimPointSmooth = target;
+                _aimPointSmoothValid = true;
+            }
+            else
+            {
+                _aimPointSmooth = Vector3.Lerp(_aimPointSmooth, target,
+                    1f - Mathf.Exp(-Time.deltaTime / AimPointTau));
+            }
+            CurrentAimPoint = _aimPointSmooth;
         }
 
         private const float MarkerInterval = 0.05f;
@@ -451,6 +524,25 @@ namespace PlayableVehicles
         private Vector3 _markerOrigin;
         private Quaternion _markerRotation;
         private Vector3 _markerPoint;
+        private bool _markerHit;
+        private const float MarkerSmoothTau = 0.12f;
+        private Vector3 _markerLocalOffset;
+        private Vector3 _markerStage1;
+        private Vector3 _markerStage2;
+        private Transform _markerSmoothMuzzle;
+        private bool _markerSmoothValid;
+        private const float AimPointTau = 0.12f;
+        private Vector3 _aimPointSmooth;
+        private bool _aimPointSmoothValid;
+        private Vector3 _aimPointDatum;
+        private Vector3 _aimRayDir;
+        private bool _aimRayValid;
+        private const float TurretAimTau = 0.08f;
+        private readonly Dictionary<Turret, Vector3> _aimDirSmooth = new Dictionary<Turret, Vector3>();
+        private const float TurretDeadzoneDegrees = 0.05f;
+        private readonly Dictionary<Turret, Vector3> _aimDirCmd = new Dictionary<Turret, Vector3>();
+
+        public bool ImpactHit => _markerHit;
 
         private bool MarkerProfile(WeaponStation station, Transform barrel, float now, out GunProfile profile)
         {
@@ -502,13 +594,12 @@ namespace PlayableVehicles
             {
                 if (hasGun)
                 {
-                    Ballistics.PredictImpact(profile, ignore, out point);
+                    _markerHit = Ballistics.PredictImpact(profile, ignore, out point, out _);
                 }
                 else
                 {
-                    point = AimRaycast.Cast(origin, barrel.forward, MaxAimDistance, ignore, out RaycastHit hit)
-                        ? hit.point
-                        : origin + barrel.forward * NoHitAimDistance;
+                    _markerHit = AimRaycast.Cast(origin, barrel.forward, MaxAimDistance, ignore, out RaycastHit hit);
+                    point = _markerHit ? hit.point : origin + barrel.forward * NoHitAimDistance;
                 }
                 _markerValid = true;
                 _markerMuzzle = muzzle;
@@ -516,6 +607,37 @@ namespace PlayableVehicles
                 _markerOrigin = origin;
                 _markerRotation = rotation;
                 _markerPoint = point;
+            }
+
+            if (point.sqrMagnitude > 0.0001f)
+            {
+                Vector3 local = Quaternion.Inverse(rotation) * (point - origin);
+                bool jump = (_markerLocalOffset - local).sqrMagnitude > 2500f;
+                if (_markerSmoothValid && muzzle == _markerSmoothMuzzle && !jump)
+                {
+                    float a = 1f - Mathf.Exp(-Time.unscaledDeltaTime / MarkerSmoothTau);
+                    Vector3 previous = _markerLocalOffset;
+                    _markerStage1 = Vector3.Lerp(_markerStage1, local, a);
+                    _markerStage2 = Vector3.Lerp(_markerStage2, _markerStage1, a);
+                    Vector3 extrapolated = 2f * _markerStage1 - _markerStage2;
+                    _markerLocalOffset = new Vector3(
+                        Mathf.Clamp(extrapolated.x, Mathf.Min(previous.x, local.x), Mathf.Max(previous.x, local.x)),
+                        Mathf.Clamp(extrapolated.y, Mathf.Min(previous.y, local.y), Mathf.Max(previous.y, local.y)),
+                        Mathf.Clamp(extrapolated.z, Mathf.Min(previous.z, local.z), Mathf.Max(previous.z, local.z)));
+                }
+                else
+                {
+                    _markerLocalOffset = local;
+                    _markerStage1 = local;
+                    _markerStage2 = local;
+                    _markerSmoothMuzzle = muzzle;
+                    _markerSmoothValid = true;
+                }
+                point = origin + rotation * _markerLocalOffset;
+            }
+            else
+            {
+                _markerSmoothValid = false;
             }
 
             Vector3 toAim = AimTargetPoint - origin;
@@ -532,7 +654,7 @@ namespace PlayableVehicles
             SelectedStationIndex = (SelectedStationIndex + delta + count) % count;
         }
 
-        private void SetWeaponSlot(int index)
+        public void SetWeaponSlot(int index)
         {
             if (_vehicle.weaponStations == null || index < 0 || index >= _vehicle.weaponStations.Count) return;
             SelectedStationIndex = index;

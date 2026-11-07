@@ -10,7 +10,7 @@ namespace PlayableVehicles
         private const float HitchReach = 4f;
         private const float MaxHitchAngle = 60f;
         private const float SearchRadius = 30f;
-        private const float MaxHitchHeightGap = 0.6f;
+        private const float MaxHitchHeightGap = 1.5f;
 
         public static bool IsTractor(GroundVehicle vehicle)
         {
@@ -86,7 +86,7 @@ namespace PlayableVehicles
         public static HitchCheck FindTrailer(GroundVehicle tractor, out GroundVehicle trailer)
         {
             trailer = null;
-            Vector3 rear = tractor.transform.TransformPoint(TowHitch.RearPoint(tractor));
+            Vector3 rear = tractor.transform.TransformPoint(TowHitch.SaddlePoint(tractor));
             float bestDistance = HitchReach;
             List<Unit> units = UnitRegistry.allUnits;
             for (int i = 0; i < units.Count; i++)
@@ -95,7 +95,7 @@ namespace PlayableVehicles
                 if (candidate == null || candidate == tractor || candidate.disabled) continue;
                 if ((candidate.transform.position - rear).sqrMagnitude > SearchRadius * SearchRadius) continue;
                 if (!VehicleGeometry.IsTrailer(candidate) || candidate.NetworkHQ != tractor.NetworkHQ || VehicleGeometry.IsBusy(candidate)) continue;
-                Vector3 front = candidate.transform.TransformPoint(TowHitch.FrontPoint(candidate));
+                Vector3 front = candidate.transform.TransformPoint(TowHitch.KingpinPoint(candidate));
                 float distance = new Vector2(front.x - rear.x, front.z - rear.z).magnitude;
                 if (distance < bestDistance)
                 {
@@ -138,19 +138,21 @@ namespace PlayableVehicles
         public GroundVehicle Tractor { get; private set; }
 
         private Rigidbody _rb;
-        private ConfigurableJoint _joint;
-        private readonly VanillaDrive _wheels = new VanillaDrive();
+        private readonly WheeledDrive _wheels = new WheeledDrive();
         private RigidbodyInterpolation _interpolation;
+        private Vector3 _centerOfMass;
         private bool _detached;
         private readonly System.Collections.Generic.List<Collider> _legs = new System.Collections.Generic.List<Collider>();
         private const float LegClearance = 0.3f;
-        private const float JoinTime = 0.5f;
-        private Vector3 _joinFrom;
-        private Vector3 _joinTo;
-        private float _joinTimer;
+        private Vector3 _anchorTractor;
+        private Vector3 _anchorTrailer;
+        private float _spring;
+        private float _damper;
+        private float _breakForce;
+        private const float HitchSpringPerMass = 30f;
+        private const float HitchDampingRatio = 0.8f;
         private const float BreakForceG = 12f;
         private const float BreakForceMin = 60000f;
-        private const float BreakTorqueArm = 3f;
 
         public void Attach(GroundVehicle trailer, GroundVehicle tractor)
         {
@@ -163,46 +165,37 @@ namespace PlayableVehicles
             VehicleDeploy.Set(trailer, false);
             trailer.enabled = false;
             _interpolation = _rb.interpolation;
+            _centerOfMass = _rb.centerOfMass;
             _rb.isKinematic = false;
             _rb.useGravity = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
-            float standing = Physics.Raycast(trailer.transform.position, Vector3.down, out RaycastHit below, 10f,
-                PhysicsLayers.StaticsMask, QueryTriggerInteraction.Ignore) ? below.distance : 1f;
-            _wheels.InitTowed(trailer, _rb, standing);
-            _rb.mass = _wheels.Mass;
-            DisableLegs(trailer);
 
-            Vector3 front = FrontPoint(trailer);
-            Vector3 rear = RearPoint(tractor);
+            Vector3 front = KingpinPoint(trailer);
+            Vector3 rear = SaddlePoint(tractor);
             Vector3 offset = tractor.transform.TransformPoint(rear) - trailer.transform.TransformPoint(front);
-            offset.y = 0f;
             _rb.position += offset;
             trailer.transform.position += offset;
-            _joinFrom = tractor.transform.InverseTransformPoint(trailer.transform.TransformPoint(front));
-            _joinTo = rear;
-            _joinTimer = 0f;
 
-            _joint = _rb.gameObject.AddComponent<ConfigurableJoint>();
-            _joint.connectedBody = tractorBody;
-            _joint.autoConfigureConnectedAnchor = false;
-            _joint.anchor = front;
-            _joint.connectedAnchor = _joinFrom;
-            _joint.enableCollision = false;
-            _joint.axis = Vector3.up;
-            _joint.secondaryAxis = Vector3.forward;
-            _joint.xMotion = _joint.yMotion = _joint.zMotion = ConfigurableJointMotion.Locked;
-            _joint.angularXMotion = _joint.angularYMotion = _joint.angularZMotion = ConfigurableJointMotion.Limited;
-            _joint.lowAngularXLimit = new SoftJointLimit { limit = -70f };
-            _joint.highAngularXLimit = new SoftJointLimit { limit = 70f };
-            _joint.angularYLimit = new SoftJointLimit { limit = 15f };
-            _joint.angularZLimit = new SoftJointLimit { limit = 25f };
-            _joint.projectionMode = JointProjectionMode.PositionAndRotation;
-            _joint.projectionDistance = 0.2f;
-            _joint.projectionAngle = 5f;
-            float breakForce = Mathf.Max(_rb.mass * 9.81f * BreakForceG, BreakForceMin);
-            if (ControlRegistry.IsClientSimulated(tractor)) breakForce = Mathf.Infinity;
-            _joint.breakForce = breakForce;
-            _joint.breakTorque = float.IsInfinity(breakForce) ? Mathf.Infinity : breakForce * BreakTorqueArm;
+            float standing = Physics.Raycast(trailer.transform.position, Vector3.down, out RaycastHit below, 10f,
+                PhysicsLayers.StaticsMask, QueryTriggerInteraction.Ignore) ? below.distance : 1f;
+            if (!_wheels.InitTowed(trailer, _rb, standing, tractorBody))
+            {
+                ModLog.Warning("Towing " + trailer.unitName + ": no wheels, cannot drive the trailer");
+                Detach(PvLogisticsEvent.HitchLost);
+                return;
+            }
+            _rb.mass = _wheels.Mass;
+            DisableLegs(trailer);
+            TrailerLegs.SetHidden(trailer, true);
+            Cargo.StowBroadcast(trailer, true);
+
+            _anchorTrailer = front;
+            _anchorTractor = rear;
+            _spring = _rb.mass * HitchSpringPerMass;
+            float mu = _rb.mass * tractorBody.mass / (_rb.mass + tractorBody.mass);
+            _damper = 2f * HitchDampingRatio * Mathf.Sqrt(_spring * mu);
+            _breakForce = Mathf.Max(_rb.mass * 9.81f * BreakForceG, BreakForceMin);
+            if (ControlRegistry.IsClientSimulated(tractor)) _breakForce = Mathf.Infinity;
             _rb.WakeUp();
         }
 
@@ -212,19 +205,24 @@ namespace PlayableVehicles
             GroundVehicle tractor = Tractor;
             _detached = true;
             Active.Remove(this);
-            if (_joint != null) Destroy(_joint);
             foreach (Collider leg in _legs)
             {
                 if (leg != null) leg.enabled = true;
             }
             _legs.Clear();
+            TrailerLegs.SetHidden(Trailer, false);
             if (Trailer != null && !Trailer.disabled)
             {
                 bool slung = Trailer.IsSlung();
                 Trailer.enabled = !slung;
                 GameAccess.GroundVehicleResetStationary(Trailer) = true;
-                if (_rb != null && !slung) _rb.interpolation = _interpolation;
+                if (_rb != null && !slung)
+                {
+                    _rb.interpolation = _interpolation;
+                    _rb.centerOfMass = _centerOfMass;
+                }
                 SettleStationary.Begin(Trailer);
+                CargoUnstow.Begin(Trailer);
             }
             GroundVehicle trailer = Trailer;
             Tractor = null;
@@ -258,7 +256,7 @@ namespace PlayableVehicles
         private void FixedUpdate()
         {
             if (_detached) return;
-            if (Trailer == null || Trailer.disabled || Tractor == null || Tractor.disabled || _joint == null)
+            if (Trailer == null || Trailer.disabled || Tractor == null || Tractor.disabled)
             {
                 Detach(PvLogisticsEvent.HitchLost);
                 return;
@@ -268,11 +266,19 @@ namespace PlayableVehicles
                 Detach(PvLogisticsEvent.HitchSlung);
                 return;
             }
-            if (_joinTimer < JoinTime)
             {
-                _joinTimer += Time.fixedDeltaTime;
-                float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_joinTimer / JoinTime));
-                _joint.connectedAnchor = Vector3.Lerp(_joinFrom, _joinTo, k);
+                Vector3 rearW = Tractor.transform.TransformPoint(_anchorTractor);
+                Vector3 frontW = Trailer.transform.TransformPoint(_anchorTrailer);
+                Vector3 error = frontW - rearW;
+                Vector3 relVel = _rb.GetPointVelocity(frontW) - Tractor.rb.GetPointVelocity(rearW);
+                Vector3 force = -(_spring * error + _damper * relVel);
+                if (force.magnitude > _breakForce)
+                {
+                    Detach(PvLogisticsEvent.HitchBroke);
+                    return;
+                }
+                _rb.AddForceAtPosition(force, frontW);
+                Tractor.rb.AddForceAtPosition(-force, rearW);
             }
             _wheels.SetTowedBrake(TractorBrake());
             _wheels.Step(0f, 0f);
@@ -285,17 +291,12 @@ namespace PlayableVehicles
             if (!_detached && Trailer != null && !Trailer.enabled) GameAccess.GroundVehicleUpdate(Trailer);
         }
 
-        private void OnJointBreak(float force)
-        {
-            if (_detached) return;
-            Detach(PvLogisticsEvent.HitchBroke);
-        }
-
         private float TractorBrake()
         {
             if (VehicleSession.IsActive && VehicleSession.Vehicle == Tractor)
             {
                 VehicleDriver driver = VehicleSession.Driver;
+                if (driver != null && driver.Own != null) return driver.Own.Brake;
                 return driver != null && driver.UsesVanillaPhysics ? driver.Vanilla.Brake : 0f;
             }
             RemoteDrivers.Session session = RemoteDrivers.FindByVehicle(Tractor);
@@ -308,27 +309,117 @@ namespace PlayableVehicles
 
         public static float HitchHeightGap(GroundVehicle tractor, GroundVehicle trailer)
         {
-            float rear = tractor.transform.TransformPoint(RearPoint(tractor)).y;
-            float front = trailer.transform.TransformPoint(FrontPoint(trailer)).y;
+            float rear = tractor.transform.TransformPoint(SaddlePoint(tractor)).y;
+            float front = trailer.transform.TransformPoint(KingpinPoint(trailer)).y;
             return rear - front;
         }
 
         private void OnDestroy()
         {
             Active.Remove(this);
-            if (!_detached && _joint != null) Destroy(_joint);
         }
 
-        public static Vector3 RearPoint(GroundVehicle tractor)
+        public static Vector3 SaddlePoint(GroundVehicle tractor)
         {
+            if (FifthWheel.TryGet(tractor, out FifthWheel wheel)) return wheel.Saddle;
             Bounds bounds = VehicleGeometry.CachedBounds(tractor);
             return new Vector3(0f, bounds.min.y + HitchHeight, bounds.min.z - RearClearance);
         }
 
-        public static Vector3 FrontPoint(GroundVehicle trailer)
+        private const float KingpinInset = 1.0f;
+
+        public static Vector3 KingpinPoint(GroundVehicle trailer)
         {
             Bounds bounds = VehicleGeometry.CachedBounds(trailer);
-            return new Vector3(0f, bounds.min.y + HitchHeight, bounds.max.z);
+            return new Vector3(0f, NoseBottom(trailer, bounds), bounds.max.z - KingpinInset);
+        }
+
+        private static readonly Dictionary<UnitDefinition, float> NoseBottomCache = new Dictionary<UnitDefinition, float>();
+        private const float NoseZone = 0.25f;
+        private const float NoseAboveBottom = 0.5f;
+
+        private static float NoseBottom(GroundVehicle trailer, Bounds bounds)
+        {
+            UnitDefinition definition = trailer.definition;
+            if (definition != null && NoseBottomCache.TryGetValue(definition, out float cached)) return cached;
+            float result = float.MaxValue;
+            Transform root = trailer.transform;
+            float frontZ = bounds.max.z - Mathf.Max(2f, bounds.size.z * NoseZone);
+            float aboveWheels = bounds.min.y + NoseAboveBottom;
+            foreach (Collider collider in trailer.GetComponentsInChildren<Collider>())
+            {
+                if (collider == null || !collider.enabled || collider.isTrigger) continue;
+                Vector3 center = root.InverseTransformPoint(collider.bounds.center);
+                if (center.z < frontZ) continue;
+                float bottom = root.InverseTransformPoint(collider.bounds.center + Vector3.down * collider.bounds.extents.y).y;
+                if (bottom < aboveWheels) continue;
+                result = Mathf.Min(result, bottom);
+            }
+            if (result > 1e8f) result = bounds.min.y + HitchHeight;
+            if (definition != null) NoseBottomCache[definition] = result;
+            return result;
+        }
+    }
+
+    internal sealed class FifthWheel
+    {
+        public Vector3 Saddle;
+
+        private const float SaddleAhead = 0.4f;
+        private const float PlateHeight = 0.1f;
+        private const float SaddleLift = 0.3f;
+        private const float RearCluster = 1.6f;
+
+        private static readonly Dictionary<VehicleDefinition, FifthWheel> Cache = new Dictionary<VehicleDefinition, FifthWheel>();
+
+        public static bool TryGet(GroundVehicle tractor, out FifthWheel wheel)
+        {
+            VehicleDefinition definition = tractor.definition as VehicleDefinition;
+            if (definition != null && Cache.TryGetValue(definition, out wheel)) return wheel != null;
+            wheel = Measure(tractor);
+            if (definition != null) Cache[definition] = wheel;
+            if (wheel != null)
+            {
+                ModLog.Info("Fifth wheel of " + tractor.unitName + ": height " + wheel.Saddle.y.ToString("F2")
+                    + " m, z " + wheel.Saddle.z.ToString("F2") + " m");
+            }
+            return wheel != null;
+        }
+
+        private static FifthWheel Measure(GroundVehicle tractor)
+        {
+            GameObject[] axles = GameAccess.GroundVehicleWheels != null ? GameAccess.GroundVehicleWheels(tractor) : null;
+            if (axles == null || axles.Length == 0) return null;
+            Transform t = tractor.transform;
+            var zs = new List<float>();
+            var tops = new List<float>();
+            foreach (GameObject axle in axles)
+            {
+                if (axle == null) continue;
+                var filter = axle.GetComponent<MeshFilter>();
+                if (filter == null || filter.sharedMesh == null) continue;
+                MeshSplit.Result split = MeshSplit.Get(filter.sharedMesh, false, out string error);
+                if (split == null) continue;
+                float scaleY = Mathf.Abs(axle.transform.lossyScale.y) > 1e-4f ? Mathf.Abs(axle.transform.lossyScale.y) : 1f;
+                for (int half = 0; half < 2; half++)
+                {
+                    if (split.Parts[half] == null) continue;
+                    Vector3 local = t.InverseTransformPoint(axle.transform.TransformPoint(split.Centers[half]));
+                    float radius = Mathf.Clamp(split.Parts[half].bounds.extents.y * scaleY, 0.3f, 0.8f);
+                    zs.Add(local.z);
+                    tops.Add(local.y + radius);
+                }
+            }
+            if (zs.Count == 0) return null;
+            float rearZ = float.MaxValue;
+            foreach (float z in zs) rearZ = Mathf.Min(rearZ, z);
+            float top = float.MinValue;
+            for (int i = 0; i < zs.Count; i++)
+            {
+                if (zs[i] < rearZ + RearCluster) top = Mathf.Max(top, tops[i]);
+            }
+            if (top < -100f) return null;
+            return new FifthWheel { Saddle = new Vector3(0f, top + PlateHeight + SaddleLift, rearZ + SaddleAhead) };
         }
     }
 
@@ -336,7 +427,7 @@ namespace PlayableVehicles
     {
         private const float MaxMass = 100000f;
         private const float RestSpeed = 0.05f;
-        private const float Friction = 1f;
+        private const float Friction = 0.45f;
 
         private readonly List<Collider> _own = new List<Collider>();
         private readonly List<Collider> _load = new List<Collider>();
@@ -371,6 +462,7 @@ namespace PlayableVehicles
             }
             Active = true;
             Mass = float.IsNaN(mass) || float.IsInfinity(mass) ? 0f : Mathf.Clamp(mass, 0f, MaxMass);
+            if (load != null && VehicleGeometry.IsTrailer(load)) TrailerLegs.SetHidden(load, towed);
         }
 
         public void Clear()
@@ -381,6 +473,7 @@ namespace PlayableVehicles
         private void Reset(bool immediate)
         {
             EndCarry();
+            if (Unit != null && VehicleGeometry.IsTrailer(Unit)) TrailerLegs.SetHidden(Unit, false);
             if (immediate) RestoreCollisions();
             else if (_own.Count > 0) _restoreAt = Time.time + RestoreDelay;
             Active = false;
@@ -427,9 +520,9 @@ namespace PlayableVehicles
             body.MoveRotation(rotation);
         }
 
-        public void Step(Rigidbody rb, VanillaDrive vanilla)
+        public void Step(Rigidbody rb, float tractorBrake)
         {
-            if (!Active || !Towed || Mass <= 0f || rb == null || !vanilla.Supported) return;
+            if (!Active || !Towed || Mass <= 0f || rb == null) return;
             Vector3 up = rb.rotation * Vector3.up;
             Vector3 forward = rb.rotation * Vector3.forward;
             Vector3 velocity = Vector3.ProjectOnPlane(rb.velocity, up);
@@ -438,8 +531,11 @@ namespace PlayableVehicles
             rb.AddForce(-Physics.gravity * Mass);
 
             Vector3 side = Vector3.Cross(forward, up);
-            Vector3 lateral = Vector3.Project(-velocity * Mass * 10f, side);
-            Vector3 braking = -velocity * Mass * 10f * vanilla.Brake;
+            float limit = support * Friction;
+            float vLat = Vector3.Dot(velocity, side);
+            float vLong = Vector3.Dot(velocity, forward);
+            Vector3 lateral = side * (-limit * GroundProbe.Tanh(vLat / 3f));
+            Vector3 braking = forward * (-tractorBrake * limit * GroundProbe.Tanh(vLong / 0.8f));
             Vector3 rolling = velocity.sqrMagnitude >= RestSpeed * RestSpeed
                 ? -(velocity.normalized + velocity * 0.05f) * (0.05f * support)
                 : Vector3.zero;
@@ -574,6 +670,8 @@ namespace PlayableVehicles
 
         private const float BoundsLifetime = 2f;
         private const int BoundsPruneSize = 64;
+        private const float BoundsPrunePeriod = 30f;
+        private static float _lastBoundsPrune;
 
         private struct CachedBound
         {
@@ -602,7 +700,11 @@ namespace PlayableVehicles
             float now = Time.time;
             int id = vehicle.GetInstanceID();
             if (InstanceBounds.TryGetValue(id, out CachedBound cached) && cached.Expires > now) return cached.Value;
-            if (InstanceBounds.Count >= BoundsPruneSize) PruneInstanceBounds(now);
+            if (InstanceBounds.Count >= BoundsPruneSize || now >= _lastBoundsPrune + BoundsPrunePeriod)
+            {
+                _lastBoundsPrune = now;
+                PruneInstanceBounds(now);
+            }
             cached.Value = LocalBounds(vehicle);
             cached.Expires = now + BoundsLifetime;
             InstanceBounds[id] = cached;

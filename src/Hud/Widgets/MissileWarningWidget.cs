@@ -13,6 +13,8 @@ namespace PlayableVehicles
         private const float MarkerSize = 36f;
         private const float EdgeFraction = 0.85f;
 
+        public override bool VisibleInProjectileCam => true;
+
         private sealed class Threat
         {
             public Missile Missile;

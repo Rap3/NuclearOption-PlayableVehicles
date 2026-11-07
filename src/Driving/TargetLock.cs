@@ -6,8 +6,11 @@ namespace PlayableVehicles
     internal sealed class TargetLock
     {
         private const float MinLockDistance = 10000f;
+        private const float LockAccuracy = 100f;
 
         private readonly List<Unit> _candidates = new List<Unit>();
+
+        public System.Func<Unit, bool> TargetAllowed { get; set; }
 
         public Unit Target { get; private set; }
 
@@ -42,7 +45,7 @@ namespace PlayableVehicles
                 return;
             }
             FactionHQ hq = vehicle != null ? vehicle.NetworkHQ : null;
-            if (hq != null && IsLockable(target, vehicle, hq)) Target = target;
+            if (hq != null && IsLockable(target, vehicle, hq) && Allowed(target)) Target = target;
         }
 
         public void Validate(GroundVehicle vehicle, bool notify)
@@ -50,7 +53,8 @@ namespace PlayableVehicles
             if (Target == null) return;
 
             FactionHQ hq = vehicle != null ? vehicle.NetworkHQ : null;
-            if (Target.disabled || hq == null || !hq.TryGetKnownPosition(Target, out _))
+            if (Target.disabled || hq == null || !hq.IsTargetPositionAccurate(Target, LockAccuracy)
+                || (TargetAllowed != null && !TargetAllowed(Target)))
             {
                 if (notify) ModLog.Notify("Target lost");
                 Target = null;
@@ -82,7 +86,7 @@ namespace PlayableVehicles
             if (AimRaycast.Cast(ray.origin, ray.direction, maxDistance, vehicle.transform, out RaycastHit hit))
             {
                 Unit hitUnit = hit.collider.GetComponentInParent<Unit>();
-                if (IsLockable(hitUnit, vehicle, hq)) return hitUnit;
+                if (IsLockable(hitUnit, vehicle, hq) && Allowed(hitUnit)) return hitUnit;
             }
 
             CollectCandidates(vehicle, hq);
@@ -123,11 +127,16 @@ namespace PlayableVehicles
             _candidates.Clear();
             foreach (PersistentID id in hq.trackingDatabase.Keys)
             {
-                if (UnitRegistry.TryGetUnit(new PersistentID?(id), out Unit unit) && IsLockable(unit, vehicle, hq))
+                if (UnitRegistry.TryGetUnit(new PersistentID?(id), out Unit unit) && IsLockable(unit, vehicle, hq) && Allowed(unit))
                 {
                     _candidates.Add(unit);
                 }
             }
+        }
+
+        private bool Allowed(Unit unit)
+        {
+            return TargetAllowed == null || TargetAllowed(unit);
         }
 
         public static bool IsKnownForeignTarget(Unit unit, GroundVehicle vehicle)
@@ -138,7 +147,9 @@ namespace PlayableVehicles
 
         private static bool IsLockable(Unit unit, GroundVehicle vehicle, FactionHQ hq)
         {
-            return unit != null && !unit.disabled && unit != vehicle && unit.NetworkHQ != hq && !(unit is Scenery);
+            if (unit == null || unit.disabled || unit == vehicle || unit.NetworkHQ == hq || unit is Scenery) return false;
+            if (!hq.IsTargetPositionAccurate(unit, LockAccuracy)) return false;
+            return hq.TryGetKnownPosition(unit, out _);
         }
     }
 }

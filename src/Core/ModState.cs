@@ -16,10 +16,17 @@ namespace PlayableVehicles
             Step("ControlRegistry", ControlRegistry.Reset);
             Step("PointDefence", PointDefence.Reset);
             Step("ArtilleryAi", ArtilleryAi.Reset);
+            Step("RadarLinkWatchdog", RadarLinkWatchdog.Reset);
             Step("VehicleSupply", VehicleSupply.Reset);
             Step("TurretSync", TurretSync.ClientReset);
             Step("HitFeedback", HitFeedback.Clear);
             Step("AmmoSync", AmmoSync.Clear);
+            Step("ShotPrediction", ShotPrediction.Clear);
+            Step("ArmorModel", ArmorModel.Reset);
+            Step("SurfaceMap", SurfaceMap.Reset);
+            Step("AiDriveLod", AiDriveLod.Reset);
+            Step("VehicleRadialMenu", VehicleRadialMenu.Reset);
+            Step("ProjectileCam", ProjectileCam.Reset);
             Step("GameUiLinks", GameUiLinks.Reset);
             Step("OwnVehicleMarkers", OwnVehicleMarkers.Reset);
             Step("DepotMarkers", DepotMarkers.Reset);

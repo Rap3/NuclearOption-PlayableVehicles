@@ -67,6 +67,14 @@ namespace PlayableVehicles
         private bool _useVanilla;
         public bool UsesVanillaPhysics => _useVanilla;
         internal VanillaDrive Vanilla => _vanilla;
+        private IGroundDrive _own;
+        private bool _useOwn;
+        internal IGroundDrive Own => _useOwn ? _own : null;
+        private Vector3 _origCenterOfMass;
+        private readonly TrackAnimator _trackAnimator = new TrackAnimator();
+        private readonly WheelAnimator _wheelAnimator = new WheelAnimator();
+        private readonly EngineSound _engineSound = new EngineSound();
+        internal EngineSound EngineSound => _engineSound;
         internal ClientLoad ClientLoad { get; } = new ClientLoad();
 
         private const float HeightResponse = 10f;
@@ -85,11 +93,17 @@ namespace PlayableVehicles
         private bool _slungAtInit;
         private bool _slungDuringSession;
 
+        private const float DeployingBlockTimeout = 60f;
+        private bool _lastDeployed;
+        private float _deployChangeTime = -999f;
+
         private static bool IsPureClient => NetBridge.IsClientOnly;
 
         public void Init(GroundVehicle vehicle, DriveMode mode)
         {
             Mode = mode;
+            GroundAiDriver ai = vehicle.GetComponent<GroundAiDriver>();
+            if (ai != null) ai.Suspend();
             _holdSaved = false;
             _bodySaved = false;
             _slungAtInit = vehicle.IsSlung();
@@ -131,7 +145,8 @@ namespace PlayableVehicles
             }
             else
             {
-                _maxForwardSpeed = _vehicle.unitName.Contains("Tank") || _vehicle.unitName.Contains("Spearhead") ? 17f : 21f;
+                _maxForwardSpeed = !string.IsNullOrEmpty(_vehicle.unitName)
+                    && (_vehicle.unitName.Contains("Tank") || _vehicle.unitName.Contains("Spearhead")) ? 17f : 21f;
             }
             _maxReverseSpeed = _maxForwardSpeed * ModConfig.ReverseSpeedFactor.Value;
             _poseSpeedLimit = Mathf.Clamp(Mathf.Max(_maxForwardSpeed, nativeTop), MinPoseSpeedLimit, MaxPoseSpeed);
@@ -157,6 +172,8 @@ namespace PlayableVehicles
             _vehicle.SetWheelsLocked(false);
             GameAccess.GroundVehicleResetStationary(_vehicle) = true;
             _vehicle.OnStationaryChanged(false);
+            _lastDeployed = _vehicle.NetworknetworkStationary;
+            _deployChangeTime = Time.time;
 
             _vehicle.enabled = false;
 
@@ -167,13 +184,24 @@ namespace PlayableVehicles
                 _origUseGravity = _rb.useGravity;
                 _origInterpolation = _rb.interpolation;
                 _origMass = _rb.mass;
+                _origCenterOfMass = _rb.centerOfMass;
                 _bodySaved = true;
 
                 _rb.isKinematic = false;
                 _rb.useGravity = true;
                 _rb.interpolation = RigidbodyInterpolation.Interpolate;
-                _useVanilla = ModConfig.VanillaPhysics.Value && Mode != DriveMode.ServerForClient && _vanilla.Init(_vehicle, _rb);
-                if (_useVanilla)
+                _own = ModConfig.VanillaPhysics.Value && Mode != DriveMode.ServerForClient ? DriveSpec.CreateDrive(_vehicle) : null;
+                _useOwn = _own != null && _own.Init(_vehicle, _rb, false);
+                _useVanilla = !_useOwn && ModConfig.VanillaPhysics.Value && Mode != DriveMode.ServerForClient && _vanilla.Init(_vehicle, _rb);
+                if (_useOwn)
+                {
+                    _own.ApplyBody();
+                    if (_own is TrackedDrive) _trackAnimator.Attach(_vehicle);
+                    if (_own is WheeledDrive wheeled) _wheelAnimator.Attach(_vehicle, wheeled, true);
+                    _engineSound.Attach(_vehicle);
+                    ModLog.Info(_vehicle.unitName + ": " + (_own.CanPivot ? "tracked" : "wheeled") + " running gear (" + _own.Spec.Prototype + ")");
+                }
+                else if (_useVanilla)
                 {
                     _rb.mass = _vanilla.Mass;
                 }
@@ -181,7 +209,12 @@ namespace PlayableVehicles
                 {
                     _rb.drag = 0.5f;
                     _rb.angularDrag = 3.0f;
-                    if (Mode == DriveMode.ServerForClient && _vehicle.definition != null && _vehicle.definition.mass > 0f)
+                    DriveSpec spec = DriveSpec.For(_vehicle);
+                    if (Mode == DriveMode.ServerForClient && spec != null)
+                    {
+                        _rb.mass = spec.MassOf(_vehicle);
+                    }
+                    else if (Mode == DriveMode.ServerForClient && _vehicle.definition != null && _vehicle.definition.mass > 0f)
                     {
                         _rb.mass = _vehicle.definition.mass;
                     }
@@ -232,11 +265,16 @@ namespace PlayableVehicles
                     _rb.interpolation = _rb.isKinematic ? RigidbodyInterpolation.None : _origInterpolation;
                 }
                 _rb.mass = _origMass;
+                if (_useOwn) _rb.centerOfMass = _origCenterOfMass;
             }
             _slungDuringSession = false;
             _holdSaved = false;
             _bodySaved = false;
             _useVanilla = false;
+            _useOwn = false;
+            _trackAnimator.Detach();
+            _wheelAnimator.Detach();
+            _engineSound.Detach();
 
             Turrets.Release();
             _currentSpeed = 0f;
@@ -263,7 +301,10 @@ namespace PlayableVehicles
             Unit missionTarget = input.MissionTargetId != 0 && UnitRegistry.TryGetUnit(new PersistentID?(new PersistentID { Id = input.MissionTargetId }), out Unit target)
                 ? target
                 : null;
-            Turrets.ApplyRemoteInput(aimPoint, input.HasAimHit, input.Station, lockTarget, input.Fire, input.FirePresses, missionTarget, input.MissionMode);
+            Vector3 aimDir = new Vector3(input.AimDirX, input.AimDirY, input.AimDirZ);
+            if (aimDir.sqrMagnitude < 1e-4f) aimDir = (aimPoint - BodyPosition).normalized;
+            else aimDir.Normalize();
+            Turrets.ApplyRemoteInput(aimPoint, aimDir, input.HasAimHit, input.Station, lockTarget, input.Fire, input.FirePresses, missionTarget, input.MissionMode);
 
             Quaternion rotation = new Quaternion(input.RotX, input.RotY, input.RotZ, input.RotW);
             float rotationLengthSqr = rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z + rotation.w * rotation.w;
@@ -317,6 +358,7 @@ namespace PlayableVehicles
         {
             return IsFinite(input.Throttle) && IsFinite(input.Steer)
                 && IsFinite(input.AimX) && IsFinite(input.AimY) && IsFinite(input.AimZ)
+                && IsFinite(input.AimDirX) && IsFinite(input.AimDirY) && IsFinite(input.AimDirZ)
                 && IsFinite(input.PosX) && IsFinite(input.PosY) && IsFinite(input.PosZ)
                 && IsFinite(input.RotX) && IsFinite(input.RotY) && IsFinite(input.RotZ) && IsFinite(input.RotW)
                 && IsFinite(input.VelX) && IsFinite(input.VelY) && IsFinite(input.VelZ);
@@ -334,6 +376,7 @@ namespace PlayableVehicles
             if (Mode != DriveMode.ClientDriver || Static || _vehicle == null || _rb == null) return;
             ClientLoad.Set(_vehicle, active, load, mass, towed);
             if (_useVanilla) _rb.mass = _vanilla.Mass + ClientLoad.Mass;
+            else if (_useOwn) _rb.mass = _own.Mass + ClientLoad.Mass;
         }
 
         public Vector3 BodyPosition => _rb != null ? _rb.position : _vehicle.transform.position;
@@ -362,7 +405,14 @@ namespace PlayableVehicles
 
             if (_rb != null)
             {
-                if (VehicleDeploy.IsDeployed(_vehicle)) HoldDeployed();
+                bool deployed = VehicleDeploy.IsDeployed(_vehicle);
+                if (deployed != _lastDeployed)
+                {
+                    _lastDeployed = deployed;
+                    _deployChangeTime = Time.time;
+                }
+                if (deployed) HoldDeployed();
+                else if (Time.time - _deployChangeTime < DeployingBlockTimeout && DeployParts.AnyMoving(_vehicle)) HoldDeploying();
                 else if (Mode == DriveMode.ServerForClient) FollowClientPose();
                 else DrivePhysics();
                 if (Mode == DriveMode.ClientDriver) ClientLoad.FixedTick(_rb);
@@ -385,6 +435,25 @@ namespace PlayableVehicles
             SetRadarAlt(0f);
         }
 
+        private float _nextDeployingNotify;
+
+        private void HoldDeploying()
+        {
+            float throttle = Throttle;
+            float steer = Steer;
+            Throttle = 0f;
+            Steer = 0f;
+            DrivePhysics();
+            Throttle = throttle;
+            Steer = steer;
+            _vehicle.speed = 0f;
+            if ((throttle != 0f || steer != 0f) && Time.unscaledTime >= _nextDeployingNotify)
+            {
+                _nextDeployingNotify = Time.unscaledTime + 2f;
+                ModLog.Notify("Wait for the vehicle to stow");
+            }
+        }
+
         private void SetRadarAlt(float height)
         {
             _vehicle.radarAlt = Mathf.Max(height, 0f);
@@ -403,10 +472,20 @@ namespace PlayableVehicles
             float throttle = Throttle;
             float steer = Steer;
 
+            if (_useOwn)
+            {
+                _own.Step(throttle, steer);
+                if (Mode == DriveMode.ClientDriver) ClientLoad.Step(_rb, _own.Brake);
+                _currentSpeed = _own.Speed;
+                _vehicle.speed = _own.Speed;
+                SetRadarAlt(_own.RadarAlt);
+                return;
+            }
+
             if (_useVanilla)
             {
                 _vanilla.Step(throttle, steer);
-                if (Mode == DriveMode.ClientDriver) ClientLoad.Step(_rb, _vanilla);
+                if (Mode == DriveMode.ClientDriver && _vanilla.Supported) ClientLoad.Step(_rb, _vanilla.Brake);
                 _currentSpeed = _vanilla.Speed;
                 _vehicle.speed = _vanilla.Speed;
                 SetRadarAlt(_vanilla.RadarAlt);
@@ -523,6 +602,12 @@ namespace PlayableVehicles
             }
 
             if (!Static) GameAccess.GroundVehicleUpdate(_vehicle);
+            if (_useOwn)
+            {
+                if (!GameplayUI.GameIsPaused && _own is TrackedDrive tracked) _trackAnimator.Tick(tracked.TrackSpeedLeft, tracked.TrackSpeedRight);
+                if (!GameplayUI.GameIsPaused) _wheelAnimator.Tick(_own.Speed);
+                _engineSound.Tick(_vehicle, _own);
+            }
 
             if (_vehicle.disabled) return;
 
@@ -533,19 +618,23 @@ namespace PlayableVehicles
             }
 
             ReadLocalInput();
-            if (InputGate.GameplayInputAllowed && InputGate.KeyDown(ModConfig.DeployKey.Value))
-            {
-                if (Static) ModLog.Notify(_vehicle.unitName + " deploys by itself while standing");
-                else if (Towing.IsTractor(_vehicle)) Towing.Toggle(_vehicle, this);
-                else if (Cargo.IsFlatbed(_vehicle)) Cargo.Toggle(_vehicle, this);
-                else VehicleDeploy.Toggle(_vehicle, this);
-            }
+            if (InputGate.GameplayInputAllowed && InputGate.KeyDown(ModConfig.DeployKey.Value)) DeployAction();
 
             if (Mode == DriveMode.Local) Turrets.TryFire();
             else
             {
+                ShotPrediction.Tick(_vehicle, Turrets);
                 ClientLink.SendInput(_vehicle, this);
             }
+        }
+
+        public void DeployAction()
+        {
+            if (_vehicle == null || _vehicle.disabled) return;
+            if (Static) ModLog.Notify(_vehicle.unitName + " deploys by itself while standing");
+            else if (Towing.IsTractor(_vehicle)) Towing.Toggle(_vehicle, this);
+            else if (Cargo.IsFlatbed(_vehicle)) Cargo.Toggle(_vehicle, this);
+            else VehicleDeploy.Toggle(_vehicle, this);
         }
 
         private void ExitSlung()

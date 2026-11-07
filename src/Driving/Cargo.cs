@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Mirage;
 using UnityEngine;
 
 namespace PlayableVehicles
@@ -123,6 +124,81 @@ namespace PlayableVehicles
             }
             return best;
         }
+
+        private static readonly Dictionary<int, float[]> _savedPoses = new Dictionary<int, float[]>();
+        private const int MaxSavedPoses = 512;
+
+        private static void SaveLauncherPoses(GroundVehicle vehicle)
+        {
+            if (_savedPoses.Count > MaxSavedPoses) _savedPoses.Clear();
+            var stations = vehicle.weaponStations;
+            if (stations == null) return;
+            foreach (WeaponStation station in stations)
+            {
+                if (station == null || station.Turrets == null) continue;
+                foreach (Turret turret in station.Turrets)
+                {
+                    if (turret == null) continue;
+                    int id = turret.GetInstanceID();
+                    if (_savedPoses.ContainsKey(id)) continue;
+                    if (GameAccess.TurretElevationTransform(turret) == null) continue;
+                    _savedPoses[id] = new[] { GameAccess.TurretTraverseAngle(turret), GameAccess.TurretElevationAngle(turret) };
+                }
+            }
+        }
+
+        private static void RestoreLauncherPoses(GroundVehicle vehicle)
+        {
+            var stations = vehicle.weaponStations;
+            if (stations == null) return;
+            foreach (WeaponStation station in stations)
+            {
+                if (station == null || station.Turrets == null) continue;
+                foreach (Turret turret in station.Turrets)
+                {
+                    if (turret == null) continue;
+                    int id = turret.GetInstanceID();
+                    if (!_savedPoses.TryGetValue(id, out float[] pose)) continue;
+                    _savedPoses.Remove(id);
+                    GameAccess.TurretTraverseAngle(turret) = pose[0];
+                    GameAccess.TurretElevationAngle(turret) = pose[1];
+                    Transform elevation = GameAccess.TurretElevationTransform(turret);
+                    if (elevation != null) elevation.localEulerAngles = new Vector3(pose[1], 0f, 0f);
+                    turret.transform.localEulerAngles = new Vector3(0f, pose[0], 0f);
+                }
+            }
+        }
+
+        public static void ApplyStow(GroundVehicle vehicle, bool stow)
+        {
+            if (vehicle == null || vehicle.disabled) return;
+            if (stow) SaveLauncherPoses(vehicle);
+            vehicle.StowTurrets(stow);
+            if (!stow) RestoreLauncherPoses(vehicle);
+            if (vehicle.radar is Radar radar)
+            {
+                radar.enabled = !stow;
+                if (stow) radar.ResetRotators();
+            }
+        }
+
+        public static void StowBroadcast(GroundVehicle vehicle, bool stow)
+        {
+            ApplyStow(vehicle, stow);
+            if (NetBridge.HasModClients)
+            {
+                NetBridge.SendToModClients(new PvCargoStow { VehicleId = vehicle.persistentID.Id, Stow = stow }, Channel.Reliable);
+            }
+        }
+
+        public static void OnStow(INetworkPlayer _, PvCargoStow message)
+        {
+            if (message.VehicleId == 0) return;
+            if (UnitRegistry.TryGetUnit(new PersistentID?(new PersistentID { Id = message.VehicleId }), out Unit unit))
+            {
+                ApplyStow(unit as GroundVehicle, message.Stow);
+            }
+        }
     }
 
     internal sealed class FlatbedBed
@@ -228,6 +304,7 @@ namespace PlayableVehicles
 
             VehicleDeploy.Set(container, false);
             container.enabled = false;
+            Cargo.StowBroadcast(container, true);
             _interpolation = _rb.interpolation;
             _rb.isKinematic = false;
             _rb.useGravity = true;
@@ -295,6 +372,7 @@ namespace PlayableVehicles
                 GameAccess.GroundVehicleResetStationary(Container) = true;
                 if (_rb != null) _rb.interpolation = _interpolation;
                 SettleStationary.Begin(Container);
+                CargoUnstow.Begin(Container);
             }
             Truck = null;
             Destroy(this);
@@ -317,6 +395,48 @@ namespace PlayableVehicles
                 return;
             }
             Container.speed = Truck.speed;
+        }
+    }
+
+    internal sealed class CargoUnstow : MonoBehaviour
+    {
+        private const float GiveUpTime = 60f;
+        private GroundVehicle _vehicle;
+        private float _started;
+
+        public static void Begin(GroundVehicle vehicle)
+        {
+            if (vehicle == null) return;
+            CargoUnstow existing = vehicle.GetComponent<CargoUnstow>();
+            if (existing != null)
+            {
+                existing._started = Time.time;
+                return;
+            }
+            var unstow = vehicle.gameObject.AddComponent<CargoUnstow>();
+            unstow._vehicle = vehicle;
+            unstow._started = Time.time;
+        }
+
+        private void FixedUpdate()
+        {
+            GroundVehicle vehicle = _vehicle;
+            if (vehicle == null || vehicle.disabled)
+            {
+                Destroy(this);
+                return;
+            }
+            if (VehicleDeploy.IsDeployed(vehicle))
+            {
+                Cargo.StowBroadcast(vehicle, false);
+                Destroy(this);
+                return;
+            }
+            if (Time.time - _started > GiveUpTime)
+            {
+                if (!VehicleGeometry.IsBusy(vehicle)) Cargo.StowBroadcast(vehicle, false);
+                Destroy(this);
+            }
         }
     }
 }

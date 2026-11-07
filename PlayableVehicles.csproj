@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>PlayableVehicles</AssemblyName>
     <RootNamespace>PlayableVehicles</RootNamespace>
-    <Version>1.0.3</Version>
+    <Version>1.1.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
@@ -98,6 +98,21 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="data/armor/*.json" LogicalName="PlayableVehicles.Armor.%(Filename).json" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PvMarkerHead>PvPrivate</PvMarkerHead>
+    <PvMarkerTail>BuildOnly</PvMarkerTail>
+  </PropertyGroup>
+  <Target Name="PvCheckNoPrivateCode" AfterTargets="CoreCompile" Condition="'$(PvPublic)' == 'true'">
+    <Exec Command="findstr /m /c:&quot;$(PvMarkerHead)$(PvMarkerTail)&quot; &quot;@(IntermediateAssembly->'%(FullPath)')&quot; &gt;nul" IgnoreExitCode="true" StandardOutputImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="PvMarkerExit" />
+    </Exec>
+    <Error Condition="'$(PvMarkerExit)' == '0'" Text="Public build contains private debug code (marker found in @(IntermediateAssembly)) - build stopped" />
+  </Target>
 
   <Target Name="DeployToGame" AfterTargets="Build" Condition="Exists('$(PluginsDir)')">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginsDir)" ContinueOnError="WarnAndContinue" />

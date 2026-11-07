@@ -44,7 +44,7 @@ namespace PlayableVehicles
 
         public static void Tick()
         {
-            bool active = VehicleShop.Enabled && Active;
+            bool active = VehicleShop.Enabled && ModConfig.Enabled.Value && Active;
             if (active && _canvas == null && !Build()) return;
             if (_canvas != null && _canvas.activeSelf != active) _canvas.SetActive(active);
             bool justShown = active && !_wasActive;

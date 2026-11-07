@@ -22,4 +22,23 @@ namespace PlayableVehicles
             }
         }
     }
+
+    [HarmonyPatch(typeof(Turret), "ChooseTarget")]
+    internal static class Turret_ChooseTarget_Patch
+    {
+        private static readonly ErrorThrottle Errors = new ErrorThrottle("Turret.ChooseTarget patch");
+
+        private static bool Prefix(Turret __instance)
+        {
+            try
+            {
+                return GameAccess.TurretFireControl == null || GameAccess.TurretFireControl(__instance) == null;
+            }
+            catch (Exception e)
+            {
+                Errors.Report(e);
+                return true;
+            }
+        }
+    }
 }

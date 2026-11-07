@@ -30,8 +30,9 @@ namespace PlayableVehicles
         private static readonly ErrorThrottle CameraErrors = new ErrorThrottle("VehicleCamera.UpdateCamera");
         private static readonly ErrorThrottle HudErrors = new ErrorThrottle("VehicleHud.Refresh");
         private static readonly ErrorThrottle SupplyErrors = new ErrorThrottle("SupplyMissionLock.Tick");
+        private static readonly ErrorThrottle RadialErrors = new ErrorThrottle("VehicleRadialMenu.Tick");
 
-        public static void Initialize(GameObject host)
+        public static void Initialize()
         {
             ViewCamera = new VehicleCamera();
             _hud = new VehicleHud();
@@ -49,6 +50,14 @@ namespace PlayableVehicles
                 AutoMapTick();
             }
             VehicleSupply.Tick(IsActive ? Vehicle : null);
+            try
+            {
+                VehicleRadialMenu.Tick();
+            }
+            catch (Exception e)
+            {
+                RadialErrors.Report(e);
+            }
             try
             {
                 SupplyMissionLock.Tick();
@@ -167,7 +176,7 @@ namespace PlayableVehicles
         private static bool TryGetSelectedPoint(out PurchasePoint point)
         {
             point = null;
-            if (!VehicleShop.Enabled || !GameManager.GetLocalHQ(out FactionHQ hq)) return false;
+            if (!VehicleShop.Enabled || !ModConfig.Enabled.Value || !GameManager.GetLocalHQ(out FactionHQ hq)) return false;
 
             if (FollowedUnit() is VehicleDepot followed && PurchasePoint.Of(followed).IsOwn(hq))
             {
@@ -300,6 +309,12 @@ namespace PlayableVehicles
                 }
             }
 
+            if (!ModConfig.Enabled.Value)
+            {
+                ModLog.Notify("Vehicles are disabled on this server");
+                return;
+            }
+
             if (vehicle.IsSlung())
             {
                 ModLog.Notify(vehicle.unitName + " is on a helicopter sling");
@@ -413,7 +428,7 @@ namespace PlayableVehicles
             HudOverrides.Apply(vehicle);
             _hud.Show(vehicle, Driver, ViewCamera);
 
-            ModLog.Notify("Possessed: " + vehicle.unitName + ". Native CombatHUD markers engaged.");
+            ModLog.Info("Entered vehicle: " + vehicle.unitName);
         }
 
         private static void Exit(string message, bool notifyHost = true, bool lost = false)
@@ -439,6 +454,7 @@ namespace PlayableVehicles
                 });
                 ExitStep("control registry", () => ControlRegistry.Forget(vehicle));
                 ExitStep("supply missions", () => SupplyMissionLock.Release(vehicle));
+                ExitStep("projectile cam", ProjectileCam.Stop);
 
                 Vehicle = null;
                 Driver = null;

@@ -106,7 +106,7 @@ namespace PlayableVehicles
         public static VehicleShop.Result TrySell(Player player, PurchasePoint point, GroundVehicle vehicle, out float refund)
         {
             refund = 0f;
-            if (!NetBridge.IsServer || !VehicleShop.Enabled) return VehicleShop.Result.Unavailable;
+            if (!NetBridge.IsServer || !VehicleShop.Enabled || !ModConfig.Enabled.Value) return VehicleShop.Result.Unavailable;
             if (player == null || player.HQ == null) return VehicleShop.Result.NoFaction;
             if (!VehicleShop.IsOwn(point, player.HQ)) return VehicleShop.Result.DepotUnavailable;
             if (vehicle == null || vehicle.disabled || vehicle.definition == null) return VehicleShop.Result.Unavailable;

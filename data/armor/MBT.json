@@ -1,0 +1,362 @@
+{
+  "prefab": "MBT",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        1.0,
+        0.45,
+        0.3,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "path": "MBT_turret",
+      "zones": [
+        1.6,
+        0.4,
+        0.25,
+        0.15,
+        0.4
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "nld",
+      "part": "",
+      "zone": "front",
+      "center": [
+        0.0,
+        -0.785,
+        3.45
+      ],
+      "size": [
+        3.8,
+        0.75,
+        1.45
+      ],
+      "mult": 0.45,
+      "spall": 2.5,
+      "detonation": -1.0
+    }
+  ],
+  "modules": [
+    {
+      "id": "ammo_bustle",
+      "kind": "ammo_bustle",
+      "part": "MBT_turret",
+      "center": [
+        -0.0,
+        0.26,
+        -2.26
+      ],
+      "size": [
+        2.67,
+        0.64,
+        1.34
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "ammo_hull",
+      "kind": "ammo",
+      "part": "",
+      "center": [
+        -0.55,
+        -0.5,
+        2.5
+      ],
+      "size": [
+        0.75,
+        0.8,
+        1.1
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "breech",
+      "kind": "gun",
+      "part": "MBT_turret",
+      "center": [
+        -0.0,
+        0.05,
+        0.7
+      ],
+      "size": [
+        0.5,
+        0.5,
+        1.4
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "commander",
+      "kind": "crew",
+      "part": "MBT_turret",
+      "center": [
+        0.7,
+        0.15,
+        -0.3
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "commander_lower",
+      "kind": "crew",
+      "part": "MBT_turret",
+      "center": [
+        0.7,
+        -0.8,
+        -0.3
+      ],
+      "size": [
+        0.6,
+        1.0,
+        0.7
+      ],
+      "external": false,
+      "link": "commander"
+    },
+    {
+      "id": "driver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        0.45,
+        -0.35,
+        2.75
+      ],
+      "size": [
+        0.65,
+        0.85,
+        1.0
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.3,
+        -3.2
+      ],
+      "size": [
+        3.7,
+        1.15,
+        1.5
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel_left",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        -1.3,
+        -0.4,
+        2.3
+      ],
+      "size": [
+        0.6,
+        0.8,
+        1.6
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel_right",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        1.3,
+        -0.4,
+        1.2
+      ],
+      "size": [
+        0.6,
+        0.8,
+        1.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner",
+      "kind": "crew",
+      "part": "MBT_turret",
+      "center": [
+        0.65,
+        0.0,
+        0.55
+      ],
+      "size": [
+        0.6,
+        0.8,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner_lower",
+      "kind": "crew",
+      "part": "MBT_turret",
+      "center": [
+        0.65,
+        -0.85,
+        0.55
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.8
+      ],
+      "external": false,
+      "link": "gunner"
+    },
+    {
+      "id": "hydraulics",
+      "kind": "turret_drive",
+      "part": "MBT_turret",
+      "center": [
+        -0.75,
+        -0.9,
+        0.0
+      ],
+      "size": [
+        0.5,
+        0.7,
+        0.9
+      ],
+      "external": false,
+      "link": "turret_drive"
+    },
+    {
+      "id": "optics",
+      "kind": "optics",
+      "part": "MBT_turret",
+      "center": [
+        0.8,
+        0.55,
+        1.3
+      ],
+      "size": [
+        0.4,
+        0.35,
+        0.45
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "track_left",
+      "kind": "track",
+      "part": "",
+      "center": [
+        -1.45,
+        -0.95,
+        -0.05
+      ],
+      "size": [
+        0.6,
+        1.2,
+        7.4
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "track_right",
+      "kind": "track",
+      "part": "",
+      "center": [
+        1.45,
+        -0.95,
+        -0.05
+      ],
+      "size": [
+        0.6,
+        1.2,
+        7.4
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "transmission",
+      "kind": "transmission",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.75,
+        -3.95
+      ],
+      "size": [
+        2.6,
+        0.6,
+        0.35
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_drive",
+      "kind": "turret_drive",
+      "part": "MBT_turret",
+      "center": [
+        -0.85,
+        -0.2,
+        0.1
+      ],
+      "size": [
+        0.45,
+        0.45,
+        0.5
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "turret_ring",
+      "kind": "turret_ring",
+      "part": "",
+      "center": [
+        -0.0,
+        0.3,
+        -0.22
+      ],
+      "size": [
+        2.4,
+        0.25,
+        2.4
+      ],
+      "external": false,
+      "link": ""
+    }
+  ]
+}

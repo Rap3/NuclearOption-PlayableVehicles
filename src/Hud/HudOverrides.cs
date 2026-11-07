@@ -45,6 +45,26 @@ namespace PlayableVehicles
         public static void Reset()
         {
             _overridden.Clear();
+            _chainAnchor = null;
+            _chainRoot = null;
+            _chain.Clear();
+        }
+
+        private static Transform _chainAnchor, _chainRoot;
+        private static readonly List<Transform> _chain = new List<Transform>();
+
+        private static List<Transform> ChainFrom(Transform anchor, Transform flightRoot)
+        {
+            if (_chainAnchor == anchor && _chainRoot == flightRoot) return _chain;
+            _chainAnchor = anchor;
+            _chainRoot = flightRoot;
+            _chain.Clear();
+            for (Transform node = anchor; node != null; node = node.parent)
+            {
+                _chain.Add(node);
+                if (node == flightRoot) break;
+            }
+            return _chain;
         }
 
         private static void ShowMinimapOnly()
@@ -77,8 +97,10 @@ namespace PlayableVehicles
                 return;
             }
 
-            for (Transform node = anchor; node != null; node = node.parent)
+            List<Transform> chain = ChainFrom(anchor, flightRoot);
+            for (int c = 0; c < chain.Count; c++)
             {
+                Transform node = chain[c];
                 SetActiveTemporarily(node.gameObject, true);
                 if (node == flightRoot) break;
                 if (!mapOnFlightCanvas && node.TryGetComponent(out Canvas canvas) && canvas.isRootCanvas) break;
@@ -89,7 +111,7 @@ namespace PlayableVehicles
                     for (int i = 0; i < parent.childCount; i++)
                     {
                         Transform sibling = parent.GetChild(i);
-                        if (sibling != node) SetActiveTemporarily(sibling.gameObject, false);
+                        if (sibling != node && !VehicleRadialMenu.IsMenuBranch(sibling)) SetActiveTemporarily(sibling.gameObject, false);
                     }
                 }
             }

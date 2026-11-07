@@ -116,9 +116,9 @@ namespace PlayableVehicles
 
         public static Result Check(Player player, PurchasePoint point, VehicleDefinition definition)
         {
-            if (!Enabled || definition == null) return Result.Unavailable;
+            if (!Enabled || !ModConfig.Enabled.Value || definition == null) return Result.Unavailable;
             if (player == null || player.HQ == null) return Result.NoFaction;
-            if (player.HQ.preventDonation) return Result.DonationsDisabled;
+            if (player.HQ.preventDonation && (point == null || point.Kind == PurchasePoint.PointKind.Depot)) return Result.DonationsDisabled;
             if (!IsOwn(point, player.HQ)) return Result.DepotUnavailable;
             Result restriction = Restriction(player, definition);
             if (restriction != Result.Purchased) return restriction;

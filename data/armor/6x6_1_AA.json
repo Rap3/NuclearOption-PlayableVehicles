@@ -1,0 +1,261 @@
+{
+  "prefab": "6x6_1_AA",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "apc_wheeled_light",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        1.7,
+        1.1,
+        1.0,
+        0.6,
+        1.2
+      ]
+    },
+    {
+      "path": "turret",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "regions": [],
+  "modules": [
+    {
+      "id": "commander",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        0.45,
+        0.2,
+        2.1
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.9
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "driver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        -0.45,
+        0.2,
+        2.1
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.9
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.14,
+        -2.64
+      ],
+      "size": [
+        1.76,
+        0.98,
+        1.28
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        -1.025,
+        -0.24,
+        -1.585
+      ],
+      "size": [
+        0.35,
+        0.68,
+        0.79
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        0.0,
+        0.2,
+        -0.85
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "sam_launcher",
+      "kind": "launcher",
+      "part": "turret",
+      "center": [
+        -0.05,
+        0.65,
+        0.66
+      ],
+      "size": [
+        2.02,
+        0.87,
+        2.4
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "transmission",
+      "kind": "transmission",
+      "part": "",
+      "center": [
+        0.0,
+        -0.65,
+        -1.8
+      ],
+      "size": [
+        1.4,
+        0.4,
+        0.5
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "wheel1_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.3,
+        -0.87,
+        1.5
+      ],
+      "size": [
+        0.5,
+        1.15,
+        1.15
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.3,
+        -0.87,
+        1.5
+      ],
+      "size": [
+        0.5,
+        1.15,
+        1.15
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.3,
+        -0.87,
+        -0.4
+      ],
+      "size": [
+        0.5,
+        1.15,
+        1.15
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.3,
+        -0.87,
+        -0.4
+      ],
+      "size": [
+        0.5,
+        1.15,
+        1.15
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.3,
+        -0.87,
+        -2.26
+      ],
+      "size": [
+        0.5,
+        1.15,
+        1.15
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel3_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.3,
+        -0.87,
+        -2.26
+      ],
+      "size": [
+        0.5,
+        1.15,
+        1.15
+      ],
+      "external": true,
+      "link": ""
+    }
+  ]
+}

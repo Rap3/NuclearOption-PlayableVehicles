@@ -1,0 +1,210 @@
+{
+  "prefab": "LCV45",
+  "zoneOrder": [
+    "front",
+    "side",
+    "rear",
+    "roof",
+    "belly"
+  ],
+  "frontThreshold": 0.25,
+  "roofThreshold": 0.7,
+  "class": "mrap",
+  "maxAngle": 60,
+  "structureShare": -1,
+  "parts": [
+    {
+      "path": "",
+      "zones": [
+        1.7,
+        1.1,
+        1.0,
+        0.6,
+        1.5
+      ]
+    },
+    {
+      "path": "mgTurret",
+      "zones": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "regions": [],
+  "modules": [
+    {
+      "id": "commander",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        0.45,
+        0.2,
+        1.2
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "driver",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        -0.45,
+        0.2,
+        1.2
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.8
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "engine",
+      "kind": "engine",
+      "part": "",
+      "center": [
+        -0.0,
+        -0.315,
+        2.47
+      ],
+      "size": [
+        1.08,
+        0.77,
+        1.14
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "fuel",
+      "kind": "fuel",
+      "part": "",
+      "center": [
+        -0.9,
+        -0.6,
+        -1.2
+      ],
+      "size": [
+        0.4,
+        0.5,
+        0.9
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "gunner",
+      "kind": "crew",
+      "part": "",
+      "center": [
+        -0.0,
+        0.3,
+        0.2
+      ],
+      "size": [
+        0.6,
+        0.9,
+        0.7
+      ],
+      "external": false,
+      "link": ""
+    },
+    {
+      "id": "rws",
+      "kind": "gun",
+      "part": "mgTurret",
+      "center": [
+        -0.004,
+        0.318,
+        0.008
+      ],
+      "size": [
+        1.174,
+        0.752,
+        0.865
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.0,
+        -1.001,
+        2.092
+      ],
+      "size": [
+        0.5,
+        1.146,
+        1.146
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel1_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.0,
+        -1.001,
+        2.092
+      ],
+      "size": [
+        0.5,
+        1.146,
+        1.146
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_left",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        -1.0,
+        -1.001,
+        -1.757
+      ],
+      "size": [
+        0.5,
+        1.146,
+        1.146
+      ],
+      "external": true,
+      "link": ""
+    },
+    {
+      "id": "wheel2_right",
+      "kind": "wheel",
+      "part": "",
+      "center": [
+        1.0,
+        -1.001,
+        -1.757
+      ],
+      "size": [
+        0.5,
+        1.146,
+        1.146
+      ],
+      "external": true,
+      "link": ""
+    }
+  ]
+}

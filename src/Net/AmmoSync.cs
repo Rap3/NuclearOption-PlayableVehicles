@@ -27,8 +27,9 @@ namespace PlayableVehicles
 
             int count = Mathf.Min(vehicle.weaponStations.Count, 16);
             if (session.AmmoSent == null || session.AmmoSent.Length != count) session.AmmoSent = new PvStationAmmo[count];
+            if (session.AmmoBuild == null || session.AmmoBuild.Length != count) session.AmmoBuild = new PvStationAmmo[count];
             bool changed = session.AmmoSentRearm != vehicle.HasRequestedRearm || session.AmmoSentCount != count;
-            var stations = new PvStationAmmo[count];
+            PvStationAmmo[] stations = session.AmmoBuild;
             for (int i = 0; i < count; i++)
             {
                 View v = Local(vehicle.weaponStations[i]);
@@ -46,6 +47,7 @@ namespace PlayableVehicles
             }
             if (!changed && now < session.AmmoKeepAliveTime) return;
 
+            session.AmmoBuild = session.AmmoSent;
             session.AmmoSent = stations;
             session.AmmoSentCount = count;
             session.AmmoSentRearm = vehicle.HasRequestedRearm;
@@ -134,6 +136,11 @@ namespace PlayableVehicles
                 view.ReloadProgress = Mathf.Max(view.ReloadProgress, weapon.GetReloadProgress());
             }
             return view;
+        }
+
+        public static string ReadoutOf(GroundVehicle vehicle, WeaponStation station)
+        {
+            return HasRemote(vehicle) ? Readout(Of(vehicle, station)) : station.GetAmmoReadout();
         }
 
         public static string Readout(View view)
