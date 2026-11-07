@@ -4,7 +4,7 @@ Versioning follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH
 (`-beta`). MAJOR — breaking changes (multiplayer protocol incompatible with older builds), MINOR — new
 features backwards-compatible, PATCH — bug fixes only. Pre-release suffix marks unreleased development.
 
-## 1.1.0-beta (unreleased)
+## 1.1.0
 
 - **Own running gear for vehicles:** wheels and road wheels with suspension (progressive bump stop, separate bump
   and rebound damping, anti-roll bars), tyre grip by surface, Ackermann steering, tracks with pivot turns, engine
