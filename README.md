@@ -270,8 +270,7 @@ something went wrong in game, attach `BepInEx\LogOutput.log` from your game fold
 
 This mod was developed with AI assistance. A significant part of its codebase was written or
 refactored by an AI coding agent under the author's direction and review. No AI-generated assets
-are used: all models, textures, audio and other content come from the game itself or were made
-by the author.
+are used: all models, textures, audio and other content come from the game itself.
 
 ## Disclaimer
 
