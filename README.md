@@ -268,7 +268,7 @@ something went wrong in game, attach `BepInEx\LogOutput.log` from your game fold
 
 ## Credits
 
-- Missile icons (R9 Stratolance, RAM-45) by **EW-25 Medusa** - thank you!
+- Missile icons (R9 Stratolance, RAM-45) - thanks **EW-25 Medusa**!
 - Compatibility with Aryx's mods (Weapons Pack, MC-260 Chimera) - thanks **Aryx**!
 
 ## AI assistance
