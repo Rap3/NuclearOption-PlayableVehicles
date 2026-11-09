@@ -84,6 +84,27 @@ namespace PlayableVehicles
                     AxleZ = new[] { 0.79f, 0.08f, -0.65f }, TrackHalf = 0.65f, WheelRadius = 0.324f, WheelBottomY = -0.771f,
                 });
             }
+            foreach (string prefab in new[] { "Aryx_HLT_HSM", "Aryx_HLT_HAIL" })
+            {
+                Add(new WheeledSpec
+                {
+                    Prefab = prefab, Prototype = "MZKT-79221", PowerKw = 588f, MaxRpm = 2000f, IdleRpm = 700f,
+                    Gears = new[] { 4.5f, 3.2f, 2.3f, 1.7f, 1.3f, 1.0f, 0.85f, 0.75f }, TopKmh = 100f, ReverseKmh = 15f, CenterOfMassY = 0.1f,
+                    AxleZ = new[] { 3.479f, 1.99f, -1.83f, -3.3f, -4.81f }, SteeredAxles = 2, TrackHalf = 1.19f, WheelRadius = 0.616f, WheelBottomY = -0.9f,
+                });
+            }
+            Add(new WheeledSpec
+            {
+                Prefab = "Aryx_HLT_HSM_Nuclear", Prototype = "MZKT-79221", PowerKw = 588f, MaxRpm = 2000f, IdleRpm = 700f,
+                Gears = new[] { 4.5f, 3.2f, 2.3f, 1.7f, 1.3f, 1.0f, 0.85f, 0.75f }, TopKmh = 100f, ReverseKmh = 15f, CenterOfMassY = 0.1f,
+                AxleZ = new[] { 3.479f, 1.99f, -1.83f, -3.3f, -4.81f }, SteeredAxles = 2, TrackHalf = 0.97f, WheelRadius = 0.616f, WheelBottomY = -0.9f,
+            });
+            Add(new WheeledSpec
+            {
+                Prefab = "Aryx_MC260_HLT-M", Prototype = "HEMTT A4", PowerKw = 373f, MaxRpm = 2100f, IdleRpm = 650f,
+                Gears = Allison6, TopKmh = 100f, ReverseKmh = 20f, CenterOfMassY = 0.1f,
+                AxleZ = new[] { 2.739f, 1.25f, -2.5f, -4.01f }, SteeredAxles = 2, TrackHalf = 1.04f, WheelRadius = 0.617f, WheelBottomY = -0.9f,
+            });
         }
 
         private static float[] Allison6 => new[] { 3.5f, 1.9f, 1.44f, 1.0f, 0.74f, 0.64f };
@@ -106,7 +127,7 @@ namespace PlayableVehicles
         private const float LongSlipScale = 0.25f;
         private const float LateralSlipScale = 0.25f;
         private const float PeakSlipTan = 0.14f;
-        private const float ParkSlipScale = 0.03f;
+        private const float ParkDamping = 0.85f;
         private const float EngineBrake = 0.15f;
         private const float ParkBrake = 0.8f;
         private const float SteerRate = 1.5f;
@@ -434,6 +455,7 @@ namespace PlayableVehicles
             int[] surfaceVotes = new int[6];
             float maxStopPerWheel = _mass / Mathf.Max(1, touching) / dt;
             Vector3 up = t.up;
+            Vector3 gFlat = Vector3.ProjectOnPlane(Physics.gravity, Vector3.up);
             for (int i = 0; i < _wheels.Length; i++)
             {
                 ref Wheel w = ref _wheels[i];
@@ -457,16 +479,30 @@ namespace PlayableVehicles
 
                 float own = drive * share;
                 float fLong = own;
-                fLong -= brake * limit * GroundProbe.Tanh(vLong / (parked ? ParkSlipScale : LongSlipScale));
+                float fLat = 0f;
+                if (parked)
+                {
+                    Vector3 hold = -gFlat * (_mass * share);
+                    fLong += Vector3.Dot(hold, fwd);
+                    fLat += Vector3.Dot(hold, side);
+                    fLong -= ParkDamping * maxStopPerWheel * vLong;
+                    fLat -= ParkDamping * maxStopPerWheel * vLat;
+                }
+                else
+                {
+                    fLong -= brake * limit * GroundProbe.Tanh(vLong / LongSlipScale);
+                    fLat = -grip.Mu * w.Load * GroundProbe.Tanh(vLat / Mathf.Max(LateralSlipScale, Mathf.Abs(vLong) * PeakSlipTan));
+                }
                 fLong -= rolling * w.Load * GroundProbe.Tanh(vLong / 0.3f);
-                float latScale = parked ? ParkSlipScale : Mathf.Max(LateralSlipScale, Mathf.Abs(vLong) * PeakSlipTan);
-                float fLat = -grip.Mu * w.Load * GroundProbe.Tanh(vLat / latScale);
 
-                float stopLong = maxStopPerWheel * Mathf.Abs(vLong);
-                float resist = fLong - own;
-                if (Mathf.Abs(resist) > stopLong) fLong = own + Mathf.Sign(resist) * stopLong;
-                float stopLat = maxStopPerWheel * Mathf.Abs(vLat);
-                if (Mathf.Abs(fLat) > stopLat) fLat = Mathf.Sign(fLat) * stopLat;
+                if (!parked)
+                {
+                    float stopLong = maxStopPerWheel * Mathf.Abs(vLong);
+                    float resist = fLong - own;
+                    if (Mathf.Abs(resist) > stopLong) fLong = own + Mathf.Sign(resist) * stopLong;
+                    float stopLat = maxStopPerWheel * Mathf.Abs(vLat);
+                    if (Mathf.Abs(fLat) > stopLat) fLat = Mathf.Sign(fLat) * stopLat;
+                }
 
                 float total = Mathf.Sqrt(fLong * fLong + fLat * fLat);
                 if (total > limit && total > 0f)

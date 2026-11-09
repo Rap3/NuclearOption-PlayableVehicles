@@ -169,6 +169,11 @@ namespace PlayableVehicles
                     }
                 }
             }
+            if (!arsenal.Nuclear && !arsenal.Ballistic && definition.unitPrefab != null
+                && definition.unitPrefab.name == "Aryx_HLT_HSM")
+            {
+                arsenal.Ballistic = true;
+            }
             _arsenals[definition] = arsenal;
             if (arsenal.Nuclear || arsenal.Ballistic)
             {

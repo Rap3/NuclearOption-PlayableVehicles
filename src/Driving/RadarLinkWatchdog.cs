@@ -42,6 +42,11 @@ namespace PlayableVehicles
             if (turrets.Length == 0) return;
             foreach (Turret turret in turrets)
             {
+                if (turret == null || Stowed(turret)) continue;
+                if (DetectorRadar(turret) is Radar radar) { vehicle.radar = radar; return; }
+            }
+            foreach (Turret turret in turrets)
+            {
                 if (turret == null || Mode(turret) != "searchForRadar" || Stowed(turret)) continue;
                 if (Detectors(turret) > 0 || FireControl(turret)) return;
             }
@@ -70,10 +75,28 @@ namespace PlayableVehicles
             return _detectorsField?.GetValue(turret) is List<TargetDetector> detectors ? detectors.Count : 0;
         }
 
+        private static Radar DetectorRadar(Turret turret)
+        {
+            _detectorsField ??= typeof(Turret).GetField("targetDetectors", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (_detectorsField?.GetValue(turret) is List<TargetDetector> detectors)
+            {
+                foreach (TargetDetector d in detectors)
+                {
+                    if (d is Radar radar) return radar;
+                }
+            }
+            return null;
+        }
+
         private static bool FireControl(Turret turret)
         {
             _fireControlField ??= typeof(Turret).GetField("fireControl", BindingFlags.Instance | BindingFlags.NonPublic);
             return _fireControlField != null && _fireControlField.GetValue(turret) != null;
+        }
+
+        public static bool HasDetectorsOrFireControl(Turret turret)
+        {
+            return Detectors(turret) > 0 || FireControl(turret);
         }
     }
 }

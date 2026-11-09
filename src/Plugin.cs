@@ -10,7 +10,7 @@ namespace PlayableVehicles
     {
         public const string Guid = "PlayableVehicles";
         public const string Name = "Nuclear Option Playable Ground Vehicles";
-        public const string Version = "1.1.0";
+        public const string Version = "1.1.1";
 
         private Harmony _harmony;
         private bool _ready;
@@ -68,6 +68,7 @@ namespace PlayableVehicles
             _updateTicks = new[]
             {
                 new GuardedTick("VehicleCatalog.Tick", VehicleCatalog.Tick),
+                new GuardedTick("WeaponIcons.Tick", WeaponIcons.Tick),
                 new GuardedTick("NetBridge.Tick", NetBridge.Tick),
                 new GuardedTick("RemoteDrivers.Tick", RemoteDrivers.Tick),
                 new GuardedTick("TurretSync.ServerTick", TurretSync.ServerTick),

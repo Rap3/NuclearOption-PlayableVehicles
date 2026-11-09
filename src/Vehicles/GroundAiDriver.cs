@@ -159,6 +159,8 @@ namespace PlayableVehicles
             if (!_active && !Take()) return;
             if (_vehicle.enabled) _vehicle.enabled = false;
 
+            LauncherArmPose.Tick(_vehicle);
+
             float dt = Time.fixedDeltaTime;
             if (_vehicle.transform.position.GlobalY() < UnderwaterGlobalY)
             {

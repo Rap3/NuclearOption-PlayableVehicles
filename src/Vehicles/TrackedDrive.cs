@@ -60,6 +60,36 @@ namespace PlayableVehicles
                 EndWheelRaise = 0.08f, RoadFrontZ = 1.2f, RoadRearZ = -0.8f, SprocketRaise = 0.3f,
                 TrackX = 0.684f, TrackZ = 0.003f, TrackLength = 2.951f, TrackBottomY = -0.716f, CenterOfMassY = -0.35f,
             },
+            ["Aryx_ADLT_01"] = new TankSpec
+            {
+                Prefab = "Aryx_ADLT_01", Prototype = "Light tank (27 t)", Mass = 27000f, PowerKw = 405f, MaxRpm = 2400f, IdleRpm = 700f,
+                Gears = new[] { 5.0f, 2.8f, 1.65f, 1.0f }, TopKmh = 70f, ReverseKmh = 20f,
+                TrackX = 1.422f, TrackZ = -0.285f, TrackLength = 7.666f, TrackBottomY = -1.325f, CenterOfMassY = -0.4f,
+            },
+            ["Aryx_CRVL_1_Recon"] = new TankSpec
+            {
+                Prefab = "Aryx_CRVL_1_Recon", Prototype = "Light tracked platform", Mass = 8000f, PowerKw = 200f, MaxRpm = 2600f, IdleRpm = 800f,
+                Gears = new[] { 4.4f, 2.5f, 1.6f, 1.0f }, TopKmh = 87f, ReverseKmh = 20f, RoadWheels = 5,
+                TrackX = 0.95f, TrackZ = 0.09f, TrackLength = 4.31f, TrackBottomY = -0.98f, CenterOfMassY = -0.4f,
+            },
+            ["Aryx_CRVL_1_Mortar"] = new TankSpec
+            {
+                Prefab = "Aryx_CRVL_1_Mortar", Prototype = "Light tracked platform", Mass = 7000f, PowerKw = 200f, MaxRpm = 2600f, IdleRpm = 800f,
+                Gears = new[] { 4.4f, 2.5f, 1.6f, 1.0f }, TopKmh = 87f, ReverseKmh = 20f, RoadWheels = 5,
+                TrackX = 0.95f, TrackZ = 0.09f, TrackLength = 4.31f, TrackBottomY = -0.98f, CenterOfMassY = -0.4f,
+            },
+            ["Aryx_FRCV_Artillery"] = new TankSpec
+            {
+                Prefab = "Aryx_FRCV_Artillery", Prototype = "M109-class SPH", Mass = 28000f, PowerKw = 331f, MaxRpm = 2300f, IdleRpm = 700f,
+                Gears = new[] { 4.5f, 3.2f, 2.3f, 1.7f, 1.3f, 1.0f }, TopKmh = 70f, ReverseKmh = 15f,
+                TrackX = 1.422f, TrackZ = -0.285f, TrackLength = 7.666f, TrackBottomY = -1.325f, CenterOfMassY = -0.4f,
+            },
+            ["Aryx_HeavyCEV"] = new TankSpec
+            {
+                Prefab = "Aryx_HeavyCEV", Prototype = "Heavy combat engineer vehicle", Mass = 53000f, PowerKw = 970f, MaxRpm = 2600f, IdleRpm = 700f,
+                Gears = new[] { 5.0f, 2.8f, 1.65f, 1.0f }, TopKmh = 80f, ReverseKmh = 15f, RoadWheels = 6,
+                TrackX = 1.85f, TrackZ = -0.47f, TrackLength = 8.6f, TrackBottomY = -1.445f, CenterOfMassY = -0.4f,
+            },
         };
 
         private static TankSpec Bradley(string prefab, string prototype, float mass, float powerKw)
@@ -82,17 +112,17 @@ namespace PlayableVehicles
         private const float ReboundShare = 1.5f;
         private const float MaxLoadG = 5f;
         private const float LongSlipScale = 0.25f;
-        private const float LateralSlipScale = 0.12f;
-        private const float ParkSlipScale = 0.03f;
+        private const float LateralSlipScale = 0.25f;
         private const float EngineBrake = 0.3f;
         private const float ParkBrake = 0.6f;
+        private const float ParkDamping = 0.85f;
         private const float PivotYawRate = 0.69f;
         private const float PivotForceBoost = 1.05f;
         private const float MaxLateralAccel = 5.5f;
         private const float SteerForce = 0.88f * 9.81f;
         private const float SteerYawSlack = 0.15f;
-        private const float LateralGrip = 0.5f;
-        private const float LateralGripMoving = 0.7f;
+        private const float LateralGrip = 1.0f;
+        private const float LateralGripMoving = 0.8f;
         private const float LateralGripSpeed = 10f;
         private const float DownhillFrom = 2f;
         private const float DownhillFull = 5f;
@@ -294,6 +324,8 @@ namespace PlayableVehicles
             {
                 if (_wheels[i].Contact) sideLoad[_wheels[i].Side] += _wheels[i].Load;
             }
+            float totalLoad = sideLoad[0] + sideLoad[1];
+            Vector3 gFlat = Vector3.ProjectOnPlane(Physics.gravity, Vector3.up);
 
             int contacts = 0, paved = 0;
             int[] surfaceVotes = _surfaceVotes;
@@ -321,16 +353,30 @@ namespace PlayableVehicles
                 float share = sideLoad[w.Side] > 0f ? w.Load / sideLoad[w.Side] : 0f;
 
                 float fLong = drive[w.Side] * share;
-                float slip = parked ? ParkSlipScale : LongSlipScale;
-                fLong -= brake[w.Side] * limit * GroundProbe.Tanh(vLong / slip);
+                float fLat = 0f;
+                if (parked)
+                {
+                    Vector3 hold = -gFlat * (_mass * (totalLoad > 0f ? w.Load / totalLoad : 0f));
+                    fLong += Vector3.Dot(hold, fwd);
+                    fLat += Vector3.Dot(hold, side);
+                    fLong -= ParkDamping * maxStopPerWheel * vLong;
+                    fLat -= ParkDamping * maxStopPerWheel * vLat;
+                }
+                else
+                {
+                    fLong -= brake[w.Side] * limit * GroundProbe.Tanh(vLong / LongSlipScale);
+                    fLat = -lateralGrip * grip.Mu * w.Load * GroundProbe.Tanh(vLat / LateralSlipScale);
+                }
                 fLong -= grip.Rolling * w.Load * GroundProbe.Tanh(vLong / 0.3f);
-                float fLat = -lateralGrip * grip.Mu * w.Load * GroundProbe.Tanh(vLat / (parked ? ParkSlipScale : LateralSlipScale));
 
-                float stopLong = maxStopPerWheel * Mathf.Abs(vLong);
-                float resist = fLong - drive[w.Side] * share;
-                if (Mathf.Abs(resist) > stopLong) fLong = drive[w.Side] * share + Mathf.Sign(resist) * stopLong;
-                float stopLat = maxStopPerWheel * Mathf.Abs(vLat);
-                if (Mathf.Abs(fLat) > stopLat) fLat = Mathf.Sign(fLat) * stopLat;
+                if (!parked)
+                {
+                    float stopLong = maxStopPerWheel * Mathf.Abs(vLong);
+                    float resist = fLong - drive[w.Side] * share;
+                    if (Mathf.Abs(resist) > stopLong) fLong = drive[w.Side] * share + Mathf.Sign(resist) * stopLong;
+                    float stopLat = maxStopPerWheel * Mathf.Abs(vLat);
+                    if (Mathf.Abs(fLat) > stopLat) fLat = Mathf.Sign(fLat) * stopLat;
+                }
 
                 float total = Mathf.Sqrt(fLong * fLong + fLat * fLat);
                 if (total > limit && total > 0f)

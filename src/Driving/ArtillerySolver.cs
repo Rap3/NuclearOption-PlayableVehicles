@@ -35,9 +35,13 @@ namespace PlayableVehicles
 
         public static bool IsArtillery(Turret turret)
         {
-            if (turret == null || GameAccess.TurretAimSolver == null || GameAccess.AimSolverArtillery == null) return false;
-            AimSolver solver = GameAccess.TurretAimSolver(turret);
-            return solver != null && GameAccess.AimSolverArtillery(solver);
+            if (turret == null) return false;
+            if (GameAccess.TurretAimSolver != null && GameAccess.AimSolverArtillery != null)
+            {
+                AimSolver solver = GameAccess.TurretAimSolver(turret);
+                if (solver != null && GameAccess.AimSolverArtillery(solver)) return true;
+            }
+            return turret.GetComponentInParent<MobileArtilleryAI>() != null;
         }
 
         public static Solution Solve(Turret turret, WeaponInfo info, Vector3 muzzle, Vector3 target, FireMode mode)

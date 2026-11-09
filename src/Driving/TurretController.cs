@@ -187,6 +187,12 @@ namespace PlayableVehicles
             StationAimPoint = applyBallistics ? AimTargetPoint + ballisticOffset : AimTargetPoint;
             bool mission = UpdateMission(station, hasGun, profile);
 
+            if (VerticalLaunchVehicle(_vehicle) && LauncherArmPose.AppliesTo(_vehicle))
+            {
+                LauncherArmPose.Tick(_vehicle);
+                if (_turrets.Count > 0 && _turrets[0] != null) TurretForward = _turrets[0].transform.forward;
+            }
+
             for (int i = 0; i < _turrets.Count; i++)
             {
                 Turret turret = _turrets[i];
@@ -382,9 +388,13 @@ namespace PlayableVehicles
         {
             if (vehicle == null) return false;
             string name = vehicle.unitName;
+            string prefab = vehicle.name;
             return name == "MSV R9 Stratolance Launcher"
                 || name == "MSV Ballistic Missile Launcher"
-                || name == "MSV Nuclear Ballistic Missile Launcher";
+                || name == "MSV Nuclear Ballistic Missile Launcher"
+                || name == "HLT Hypersonic Missile Launcher" || prefab == "Aryx_HLT_HSM"
+                || name == "HLT Hypersonic Nuclear Missile Launcher" || prefab == "Aryx_HLT_HSM_Nuclear"
+                || name == "HLT High Altitude Intercept Launcher" || prefab == "Aryx_HLT_HAIL";
         }
 
         public void ReadLocalInput()
@@ -678,6 +688,16 @@ namespace PlayableVehicles
                     _nextNoRadarNotice = Time.time + NoRadarNoticeInterval;
                     if (!Silent) ModLog.Notify(NoRadarText);
                     else RemoteNotice?.Invoke(PvNoticeKind.NoRadar);
+                }
+                return false;
+            }
+            if (VerticalLaunchVehicle(_vehicle)
+                && (!VehicleDeploy.IsDeployed(_vehicle) || LauncherArmPose.InProgress(_vehicle)))
+            {
+                if (Time.time >= _nextNoRadarNotice)
+                {
+                    _nextNoRadarNotice = Time.time + NoRadarNoticeInterval;
+                    if (!Silent) ModLog.Notify("Deploy " + _vehicle.unitName + " to fire");
                 }
                 return false;
             }

@@ -1,4 +1,17 @@
 # Changelog
+
+## 1.1.1
+
+- **Support for ground vehicles added by other mods** (tested with Aryx Weapons Pack and MC-260 Chimera): mod-added
+  trucks, APCs, artillery and launchers get the same playable treatment — own running gear with ride height matched
+  to the game AI, the fire control computer (B), working fold / unfold of vertical-launch launcher arms, and correct
+  radar-link behavior for radar-dependent launchers. Compatibility with mods other than these two still needs
+  verification.
+- The R9 Stratolance and RAM-45 missiles get their own images (in the depot purchase panel and in the vehicle
+  weapon list) instead of the game's generic missile icon.
+- Fixed: parked vehicles slowly creeping or sliding on slopes and when standing still (issue #8).
+- Fixed: LCV45 Recon Truck right-side wheels did not steer.
+
 ## 1.1.0
 
 - **Own running gear for vehicles:** wheels and road wheels with suspension (progressive bump stop, separate bump

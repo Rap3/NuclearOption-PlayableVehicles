@@ -29,6 +29,7 @@ namespace PlayableVehicles
             MissileSeeker seeker = Seeker(Launcher(station));
             if (seeker is BallisticMissileGuidance) return FireMissionKind.Ballistic;
             if (seeker is SARHSeeker || seeker is IRSeeker || seeker is ARHSeeker) return FireMissionKind.AirDefense;
+            if (seeker != null) return FireMissionKind.Ballistic;
             return FireMissionKind.None;
         }
 
@@ -56,12 +57,21 @@ namespace PlayableVehicles
 
         public static bool NeedsRadar(WeaponStation station)
         {
-            return Seeker(Launcher(station)) is SARHSeeker;
+            MissileSeeker seeker = Seeker(Launcher(station));
+            if (seeker is SARHSeeker) return true;
+            return seeker != null && seeker.GetType().Name == "AryxABMSeeker";
         }
 
         public static bool HasRadar(GroundVehicle vehicle)
         {
-            return vehicle != null && (vehicle.radar != null || !vehicle.IsServer);
+            if (vehicle == null) return false;
+            if (vehicle.radar != null || !vehicle.IsServer) return true;
+            foreach (Turret turret in vehicle.GetComponentsInChildren<Turret>(true))
+            {
+                if (turret == null) continue;
+                if (RadarLinkWatchdog.HasDetectorsOrFireControl(turret)) return true;
+            }
+            return false;
         }
 
         public static ArtillerySolver.Solution Check(FireMissionKind kind, GroundVehicle vehicle, WeaponStation station, Unit target)

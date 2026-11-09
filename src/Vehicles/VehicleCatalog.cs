@@ -27,36 +27,41 @@ namespace PlayableVehicles
             int replaced = 0;
             foreach (VehicleDefinition definition in encyclopedia.vehicles)
             {
-                if (definition == null || definition.unitPrefab == null || _vanilla.ContainsKey(definition)) continue;
-                try
-                {
-                    GameObject vanilla = definition.unitPrefab;
-                    GameObject prefab = Object.Instantiate(vanilla, _holder.transform);
-                    prefab.name = vanilla.name;
-                    prefab.AddComponent<PvVehicle>().Definition = definition;
-                    if (DriveSpec.Has(prefab.name) && prefab.GetComponent<GroundVehicle>() != null)
-                    {
-                        TuneRecoil(prefab);
-                        prefab.AddComponent<GroundAiDriver>();
-                        prefab.AddComponent<RemoteVehicleVisuals>();
-                    }
-                    _vanilla[definition] = vanilla;
-                    definition.unitPrefab = prefab;
-                    replaced++;
-                }
-                catch (Exception e)
-                {
-                    ModLog.Error("Vehicle catalog: " + definition.unitName + " kept vanilla: " + e.Message);
-                }
+                if (Process(definition)) replaced++;
             }
             Installed = true;
             if (replaced > 0) ModLog.Info("Vehicle catalog: " + replaced + " vehicle prefabs replaced with the mod's");
         }
 
+        private static bool Process(VehicleDefinition definition)
+        {
+            if (definition == null || definition.unitPrefab == null || _vanilla.ContainsKey(definition)) return false;
+            try
+            {
+                GameObject vanilla = definition.unitPrefab;
+                GameObject prefab = Object.Instantiate(vanilla, _holder.transform);
+                prefab.name = vanilla.name;
+                prefab.AddComponent<PvVehicle>().Definition = definition;
+                if (DriveSpec.Has(prefab.name) && prefab.GetComponent<GroundVehicle>() != null)
+                {
+                    TuneRecoil(prefab);
+                    prefab.AddComponent<GroundAiDriver>();
+                    prefab.AddComponent<RemoteVehicleVisuals>();
+                }
+                _vanilla[definition] = vanilla;
+                definition.unitPrefab = prefab;
+                return true;
+            }
+            catch (Exception e)
+            {
+                ModLog.Error("Vehicle catalog: " + definition.unitName + " kept vanilla: " + e.Message);
+                return false;
+            }
+        }
+
+        private static float _nextScan;
         public static void Tick()
         {
-            if (Installed || Time.unscaledTime < _nextTry) return;
-            _nextTry = Time.unscaledTime + 1f;
             Encyclopedia encyclopedia;
             try
             {
@@ -66,7 +71,22 @@ namespace PlayableVehicles
             {
                 return;
             }
-            if (encyclopedia != null && encyclopedia.vehicles != null && encyclopedia.vehicles.Count > 0) Install(encyclopedia);
+            if (encyclopedia == null || encyclopedia.vehicles == null || encyclopedia.vehicles.Count == 0) return;
+            if (!Installed)
+            {
+                if (Time.unscaledTime < _nextTry) return;
+                _nextTry = Time.unscaledTime + 1f;
+                Install(encyclopedia);
+                return;
+            }
+            if (Time.unscaledTime < _nextScan) return;
+            _nextScan = Time.unscaledTime + 5f;
+            int added = 0;
+            foreach (VehicleDefinition definition in encyclopedia.vehicles)
+            {
+                if (Process(definition)) added++;
+            }
+            if (added > 0) ModLog.Info("Vehicle catalog: " + added + " late vehicle prefabs replaced (mod-added vehicles)");
         }
 
         private const float RecoilPerRound = 0.45f;

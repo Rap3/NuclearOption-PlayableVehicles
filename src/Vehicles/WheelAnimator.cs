@@ -54,39 +54,57 @@ namespace PlayableVehicles
                     ModLog.Warning(vehicle.unitName + ": wheel mesh '" + filter.sharedMesh.name + "' could not be split - these wheels do not steer or travel: " + error);
                     continue;
                 }
+                AttachMesh(axle.transform, filter.sharedMesh, renderer, split, index, root);
 
-                for (int half = 0; half < 2; half++)
+                foreach (Transform child in axle.transform)
                 {
-                    if (split.Parts[half] == null) continue;
-                    Vector3 center = axle.transform.TransformPoint(split.Centers[half]);
-                    var pivot = new GameObject(axle.name + (half == 0 ? "_PvSteerA" : "_PvSteerB"));
-                    pivot.layer = axle.layer;
-                    pivot.transform.SetParent(root, false);
-                    pivot.transform.SetPositionAndRotation(center, root.rotation);
-
-                    var wheel = new GameObject(axle.name + "_PvWheel");
-                    wheel.layer = axle.layer;
-                    wheel.transform.SetParent(pivot.transform, false);
-                    wheel.transform.SetPositionAndRotation(axle.transform.position, axle.transform.rotation);
-                    wheel.transform.localScale = Divide(axle.transform.lossyScale, root.lossyScale);
-                    wheel.AddComponent<MeshFilter>().sharedMesh = split.Parts[half];
-                    var copy = wheel.AddComponent<MeshRenderer>();
-                    copy.sharedMaterials = renderer.sharedMaterials;
-                    copy.shadowCastingMode = renderer.shadowCastingMode;
-                    copy.receiveShadows = renderer.receiveShadows;
-
-                    _created.Add(pivot);
-                    _wheels.Add(new SteeredWheel
+                    var cf = child.GetComponent<MeshFilter>();
+                    var cr = child.GetComponent<MeshRenderer>();
+                    if (cf == null || cr == null || cf.sharedMesh == null) continue;
+                    MeshSplit.Result childSplit = MeshSplit.Get(cf.sharedMesh, false, out string childError);
+                    if (childSplit == null)
                     {
-                        Pivot = pivot.transform,
-                        Rest = pivot.transform.localPosition,
-                        Axle = index,
-                        Side = root.InverseTransformPoint(center).x < 0f ? 0 : 1,
-                    });
+                        ModLog.Warning(vehicle.unitName + ": child wheel mesh '" + cf.sharedMesh.name + "' could not be split: " + childError);
+                        continue;
+                    }
+                    AttachMesh(child, cf.sharedMesh, cr, childSplit, index, root);
                 }
-                renderer.enabled = false;
-                _hidden.Add(renderer);
             }
+        }
+
+        private void AttachMesh(Transform holder, Mesh mesh, Renderer renderer, MeshSplit.Result split, int axle, Transform root)
+        {
+            for (int half = 0; half < 2; half++)
+            {
+                if (split.Parts[half] == null) continue;
+                Vector3 center = holder.TransformPoint(split.Centers[half]);
+                var pivot = new GameObject(holder.name + (half == 0 ? "_PvSteerA" : "_PvSteerB"));
+                pivot.layer = holder.gameObject.layer;
+                pivot.transform.SetParent(root, false);
+                pivot.transform.SetPositionAndRotation(center, root.rotation);
+
+                var wheel = new GameObject(holder.name + "_PvWheel");
+                wheel.layer = holder.gameObject.layer;
+                wheel.transform.SetParent(pivot.transform, false);
+                wheel.transform.SetPositionAndRotation(holder.position, holder.rotation);
+                wheel.transform.localScale = Divide(holder.lossyScale, root.lossyScale);
+                wheel.AddComponent<MeshFilter>().sharedMesh = split.Parts[half];
+                var copy = wheel.AddComponent<MeshRenderer>();
+                copy.sharedMaterials = renderer.sharedMaterials;
+                copy.shadowCastingMode = renderer.shadowCastingMode;
+                copy.receiveShadows = renderer.receiveShadows;
+
+                _created.Add(pivot);
+                _wheels.Add(new SteeredWheel
+                {
+                    Pivot = pivot.transform,
+                    Rest = pivot.transform.localPosition,
+                    Axle = axle,
+                    Side = root.InverseTransformPoint(center).x < 0f ? 0 : 1,
+                });
+            }
+            renderer.enabled = false;
+            _hidden.Add(renderer);
         }
 
         public void Tick(float speed)

@@ -266,11 +266,17 @@ Keys use Unity key names: `F7`, `X`, `UpArrow`, `Keypad5` and so on.
 Found a bug or have an idea? Open an [issue](https://github.com/Rap3/NuclearOption-PlayableVehicles/issues). If
 something went wrong in game, attach `BepInEx\LogOutput.log` from your game folder, it helps a lot.
 
+## Credits
+
+- Missile icons (R9 Stratolance, RAM-45) by **EW-25 Medusa** - thank you!
+- Compatibility with Aryx's mods (Weapons Pack, MC-260 Chimera) - thanks **Aryx**!
+
 ## AI assistance
 
 This mod was developed with AI assistance. A significant part of its codebase was written or
 refactored by an AI coding agent under the author's direction and review. No AI-generated assets
-are used: all models, textures, audio and other content come from the game itself.
+are used: all models, textures, audio and other content come from the game itself or were made
+by the author.
 
 ## Disclaimer
 

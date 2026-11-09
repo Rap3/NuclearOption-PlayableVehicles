@@ -22,6 +22,22 @@ namespace PlayableVehicles
             PartType?.GetField("staysDeployed", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly FieldInfo TransformField =
             PartType?.GetField("transform", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo RateField =
+            PartType?.GetField("deployRate", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo AngleStowedField =
+            PartType?.GetField("angleStowed", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo AngleDeployedField =
+            PartType?.GetField("angleDeployed", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo PosStowedField =
+            PartType?.GetField("positionStowed", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo PosDeployedField =
+            PartType?.GetField("positionDeployed", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo DisableWhenStowedField =
+            PartType?.GetField("disableWhenStowed", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo PartRadarField =
+            PartType?.GetField("radar", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo PartColliderField =
+            PartType?.GetField("collider", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly FieldInfo TurretField =
             PartType?.GetField("turret", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly FieldInfo TurretStowed = typeof(Turret).GetField("stowed", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -47,6 +63,18 @@ namespace PlayableVehicles
             return d;
         }
 
+        private static string PathOf(Transform t)
+        {
+            var sb = new System.Text.StringBuilder();
+            while (t != null && sb.Length < 200)
+            {
+                if (sb.Length > 0) sb.Insert(0, "/");
+                sb.Insert(0, t.name);
+                t = t.parent;
+            }
+            return sb.ToString();
+        }
+
         public static IEnumerable<object> DebugDump(Array parts)
         {
             var dump = new List<object>();
@@ -64,6 +92,16 @@ namespace PlayableVehicles
                     ["euler"] = TransformField?.GetValue(part) is Transform tt
                         ? (object)(Mathf.Round(tt.localEulerAngles.x) + "," + Mathf.Round(tt.localEulerAngles.y) + "," + Mathf.Round(tt.localEulerAngles.z))
                         : null,
+                    ["rate"] = RateField != null ? (object)(float)RateField.GetValue(part) : null,
+                    ["angStowed"] = AngleStowedField?.GetValue(part)?.ToString(),
+                    ["angDeployed"] = AngleDeployedField?.GetValue(part)?.ToString(),
+                    ["posStowed"] = PosStowedField?.GetValue(part)?.ToString(),
+                    ["posDeployed"] = PosDeployedField?.GetValue(part)?.ToString(),
+                    ["disableWhenStowed"] = DisableWhenStowedField != null && (bool)DisableWhenStowedField.GetValue(part),
+                    ["partRadar"] = PartRadarField?.GetValue(part) != null,
+                    ["partCollider"] = PartColliderField?.GetValue(part) != null,
+                    ["partTurret"] = TurretField?.GetValue(part) is Turret pt ? pt.name : null,
+                    ["path"] = TransformField?.GetValue(part) is Transform tp ? PathOf(tp) : null,
                 };
                 foreach (var kv in TurretDump(part)) entry[kv.Key] = kv.Value;
                 dump.Add(entry);
@@ -73,7 +111,9 @@ namespace PlayableVehicles
 
         public static bool AnyMoving(GroundVehicle vehicle)
         {
-            if (!Available || vehicle == null) return false;
+            if (vehicle == null) return false;
+            if (LauncherArmPose.InProgress(vehicle)) return true;
+            if (!Available) return false;
             Array parts = GameAccess.GroundVehicleDeployableParts(vehicle);
             if (parts == null || parts.Length == 0) return false;
             for (int i = 0; i < parts.Length; i++)
