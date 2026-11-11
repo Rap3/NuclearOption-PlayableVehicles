@@ -149,8 +149,16 @@ namespace PlayableVehicles
         {
             if (truck == null || container == null) return null;
             Bounds size = VehicleGeometry.CachedBounds(container);
-            string bed = FlatbedBed.TryGet(truck, out FlatbedBed measured) ? " on a " + UnitConverter.DimensionReading(measured.Length) + " bed" : "";
-            return container.unitName + " is too long for " + truck.unitName + ": " + UnitConverter.DimensionReading(size.size.z) + bed;
+            if (!FlatbedBed.TryGet(truck, out FlatbedBed measured))
+                return container.unitName + " does not fit " + truck.unitName;
+            if (size.size.x > measured.Width + Cargo.SizeTolerance)
+            {
+                return container.unitName + " is too wide for " + truck.unitName + ": "
+                    + UnitConverter.DimensionReading(size.size.x) + " m on a " + UnitConverter.DimensionReading(measured.Width) + " m bed";
+            }
+            return container.unitName + " is too long for " + truck.unitName + ": " + UnitConverter.DimensionReading(size.size.z)
+                + " m on a " + UnitConverter.DimensionReading(measured.Length) + " m bed (up to "
+                + UnitConverter.DimensionReading(measured.Length + Cargo.LengthOverhang) + " m with overhang)";
         }
     }
 }

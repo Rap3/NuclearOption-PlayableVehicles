@@ -10,7 +10,10 @@ namespace PlayableVehicles
 
         private const float LoadGap = 3f;
         private const float SearchRadius = 30f;
-        private const float SizeTolerance = 0.3f;
+        public const float SizeTolerance = 0.3f;
+        public const float LengthOverhang = 2f;
+        public const float CargoMassShare = 0.5f;
+        public const float CargoBackMargin = 0.6f;
 
         public static bool IsFlatbed(GroundVehicle vehicle)
         {
@@ -106,7 +109,7 @@ namespace PlayableVehicles
                     : VehicleGeometry.IsBusy(candidate) ? "busy"
                     : gap > LoadGap ? "too far (" + gap.ToString("F1") + " m)"
                     : null;
-                if (reason == null && (size.size.z > bed.Length + SizeTolerance || size.size.x > bed.Width + SizeTolerance))
+                if (reason == null && (size.size.z > bed.Length + LengthOverhang || size.size.x > bed.Width + SizeTolerance))
                 {
                     tooBig = candidate;
                     reason = "too big (" + size.size.z.ToString("F1") + " x " + size.size.x.ToString("F1") + " m)";
@@ -291,6 +294,7 @@ namespace PlayableVehicles
         private Rigidbody _rb;
         private FixedJoint _joint;
         private FlatbedBed _bed;
+        private float _massBefore;
         private RigidbodyInterpolation _interpolation;
         private bool _unloaded;
 
@@ -309,13 +313,19 @@ namespace PlayableVehicles
             _rb.isKinematic = false;
             _rb.useGravity = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
-            if (container.definition != null && container.definition.mass > 0f) _rb.mass = container.definition.mass;
+            _massBefore = _rb.mass;
+            if (container.definition != null && container.definition.mass > 0f) _rb.mass = container.definition.mass * Cargo.CargoMassShare;
+            WheeledDrive truckDrive = WheeledDrive.For(truck);
+            if (truckDrive != null) truckDrive.SetPayload(_rb.mass);
 
             Bounds size = VehicleGeometry.LocalBounds(container);
             Transform t = truck.transform;
             Quaternion rotation = t.rotation;
             Vector3 bottomCenter = new Vector3(size.center.x, size.min.y, size.center.z);
-            Vector3 position = t.TransformPoint(bed.Center + Vector3.up * 0.05f) - rotation * bottomCenter;
+            Vector3 bedCenter = bed.Center + Vector3.up * 0.05f;
+            float excess = Mathf.Max(0f, size.size.z - bed.Length);
+            if (excess > 0.01f) bedCenter.z -= excess * 0.5f + Cargo.CargoBackMargin;
+            Vector3 position = t.TransformPoint(bedCenter) - rotation * bottomCenter;
             _rb.velocity = truck.rb != null ? truck.rb.velocity : Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
             _rb.position = position;
@@ -366,6 +376,9 @@ namespace PlayableVehicles
             _unloaded = true;
             Active.Remove(this);
             if (_joint != null) Destroy(_joint);
+            WheeledDrive releasedDrive = WheeledDrive.For(Truck);
+            if (releasedDrive != null) releasedDrive.SetPayload(0f);
+            if (_rb != null && _massBefore > 0f) _rb.mass = _massBefore;
             if (Container != null && !Container.disabled)
             {
                 Container.enabled = true;

@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>PlayableVehicles</AssemblyName>
     <RootNamespace>PlayableVehicles</RootNamespace>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>

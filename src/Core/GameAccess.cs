@@ -17,6 +17,11 @@ namespace PlayableVehicles
         public static AccessTools.FieldRef<Turret, Transform> TurretElevationTransform { get; private set; }
         public static AccessTools.FieldRef<Turret, float> TurretTraverseAngle { get; private set; }
         public static AccessTools.FieldRef<Turret, float> TurretElevationAngle { get; private set; }
+        public static AccessTools.FieldRef<Turret, bool> TurretManual { get; private set; }
+        public static AccessTools.FieldRef<Turret, float> TurretTraverseRate { get; private set; }
+        public static AccessTools.FieldRef<Turret, float> TurretElevationRate { get; private set; }
+        public static AccessTools.FieldRef<Turret, float> TurretTraverseRange { get; private set; }
+        public static AccessTools.FieldRef<Turret, float> TurretMinElevation { get; private set; }
         public static AccessTools.FieldRef<Turret, FireControl> TurretFireControl { get; private set; }
 
         public static AccessTools.FieldRef<UnitPart, bool> UnitPartCriticalPart { get; private set; }
@@ -209,6 +214,11 @@ namespace PlayableVehicles
             TurretElevationTransform = Field<Turret, Transform>("elevationTransform");
             TurretTraverseAngle = Field<Turret, float>("traverseAngle");
             TurretElevationAngle = Field<Turret, float>("elevationAngle");
+        TurretManual = Field<Turret, bool>("manual");
+            TurretTraverseRate = OptionalField<Turret, float>("traverseRate");
+            TurretElevationRate = OptionalField<Turret, float>("elevationRate");
+            TurretTraverseRange = OptionalField<Turret, float>("traverseRange");
+            TurretMinElevation = OptionalField<Turret, float>("minElevation");
             TurretFireControl = OptionalField<Turret, FireControl>("fireControl");
 
             UnitPartCriticalPart = Field<UnitPart, bool>("criticalPart");

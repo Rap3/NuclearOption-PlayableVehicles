@@ -191,7 +191,7 @@ namespace PlayableVehicles
                 }
                 return;
             }
-            if (_rb.isKinematic) _rb.isKinematic = false;
+            if (_rb.isKinematic && !(_drive is WheeledDrive parkedAi && parkedAi.Parked)) _rb.isKinematic = false;
 
             if (Time.time - _stationaryChangeTime < DeployingBlockTimeout && DeployParts.AnyMoving(_vehicle))
             {

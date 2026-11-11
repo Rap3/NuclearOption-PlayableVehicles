@@ -46,12 +46,28 @@ namespace PlayableVehicles
         private int _solvedStationIndex = -1;
         private Unit _solvedTarget;
 
+        private static bool Zoomed => VehicleSession.IsActive && VehicleSession.ViewCamera != null && VehicleSession.ViewCamera.IsZoomed;
+        private static float TurretAimTauActive => Zoomed ? TurretAimTau * 0.4f : TurretAimTau;
+
+        private sealed class GunState
+        {
+            public float Yaw;
+            public float Pitch;
+            public int Frame;
+        }
+
+        private readonly Dictionary<Turret, GunState> _gunState = new Dictionary<Turret, GunState>();
+        private readonly List<Turret> _heldTurrets = new List<Turret>();
+        private readonly List<Vector3> _heldDirections = new List<Vector3>();
+
         public Turret PrimaryTurret => _turrets.Count > 0 ? _turrets[0] : null;
+        public Transform SelectedBarrel => StationBarrel(SelectedStation);
         public int SelectedStationIndex { get; private set; }
         public Vector3 AimRayDir => _aimRayDir;
         public bool AimRayValid => _aimRayValid;
         public Vector3 CurrentAimPoint { get; private set; }
         public bool HasAimHit { get; private set; }
+
         public Vector3 TurretForward { get; private set; }
 
         public Unit LockedTarget => _lock.Target;
@@ -125,6 +141,7 @@ namespace PlayableVehicles
         public void Attach(GroundVehicle vehicle)
         {
             _vehicle = vehicle;
+            RestoreTraverseRates();
             _turrets.Clear();
             _turretWasEnabled.Clear();
             _lock.Clear();
@@ -139,6 +156,10 @@ namespace PlayableVehicles
             _aimDirSmooth.Clear();
             _aimDirCmd.Clear();
             _aimRayValid = false;
+            _aimDistanceValid = false;
+            _heldTurrets.Clear();
+            _heldDirections.Clear();
+            _gunState.Clear();
 
             foreach (Turret turret in vehicle.GetComponentsInChildren<Turret>(true))
             {
@@ -148,11 +169,54 @@ namespace PlayableVehicles
                 turret.enabled = true;
             }
 
+            ScaleTraverseRates();
             SelectedStationIndex = 0;
+        }
+
+        private readonly List<float> _baseTraverseRates = new List<float>();
+        private readonly List<float> _baseElevationRates = new List<float>();
+
+        private void ScaleTraverseRates()
+        {
+            _baseTraverseRates.Clear();
+            _baseElevationRates.Clear();
+            bool available = GameAccess.TurretTraverseRate != null && GameAccess.TurretElevationRate != null;
+            float scale = Mathf.Clamp(ModConfig.TurretTraverseScale.Value, 0.25f, 3f);
+            bool apply = available && !Mathf.Approximately(scale, 1f);
+            for (int i = 0; i < _turrets.Count; i++)
+            {
+                Turret turret = _turrets[i];
+                float traverse = available && turret != null ? GameAccess.TurretTraverseRate(turret) : 0f;
+                float elevation = available && turret != null ? GameAccess.TurretElevationRate(turret) : 0f;
+                _baseTraverseRates.Add(traverse);
+                _baseElevationRates.Add(elevation);
+                if (!apply || turret == null) continue;
+                GameAccess.TurretTraverseRate(turret) = traverse * scale;
+                GameAccess.TurretElevationRate(turret) = elevation * scale;
+            }
+        }
+
+        private void RestoreTraverseRates()
+        {
+            bool available = GameAccess.TurretTraverseRate != null && GameAccess.TurretElevationRate != null;
+            if (available)
+            {
+                int count = Mathf.Min(_turrets.Count, _baseTraverseRates.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    Turret turret = _turrets[i];
+                    if (turret == null) continue;
+                    GameAccess.TurretTraverseRate(turret) = _baseTraverseRates[i];
+                    GameAccess.TurretElevationRate(turret) = _baseElevationRates[i];
+                }
+            }
+            _baseTraverseRates.Clear();
+            _baseElevationRates.Clear();
         }
 
         public void Release()
         {
+            RestoreTraverseRates();
             for (int i = 0; i < _turrets.Count; i++)
             {
                 if (_turrets[i] != null) _turrets[i].enabled = _turretWasEnabled[i];
@@ -164,6 +228,9 @@ namespace PlayableVehicles
             MissionTarget = null;
             MissionMode = FireMode.None;
             SetWeaponTarget(null, null);
+            _heldTurrets.Clear();
+            _heldDirections.Clear();
+            _gunState.Clear();
             _fireHeld = false;
             _remoteFire = false;
             _pendingShots = 0;
@@ -173,6 +240,8 @@ namespace PlayableVehicles
 
         public void AimTurrets()
         {
+            _heldTurrets.Clear();
+            _heldDirections.Clear();
             _lock.Validate(_vehicle, !Silent);
             WeaponStation station = SelectedStation;
             _lock.TargetAllowed = unit => !SamOnlyAir(_vehicle) || unit is Aircraft || unit is Missile;
@@ -204,12 +273,14 @@ namespace PlayableVehicles
                 if (mission && stationTurret && ArtillerySolver.IsArtillery(turret))
                 {
                     GameAccess.TurretAimTurret(turret, MissionSolution.Direction);
+                    HoldBarrel(turret, MissionSolution.Direction);
                     if (i == 0) TurretForward = turret.transform.forward;
                     continue;
                 }
                 Vector3 target = stationTurret ? StationAimPoint : CurrentAimPoint;
-                Vector3 aimDir = target - turret.transform.position;
-                if (!IsTracking && _aimRayValid)
+                Transform elevationAxis = GameAccess.TurretElevationTransform != null ? GameAccess.TurretElevationTransform(turret) : null;
+                Vector3 aimDir = target - (elevationAxis != null ? elevationAxis.position : turret.transform.position);
+                if (!IsTracking && _aimRayValid && !ModConfig.AimAtCrosshairPoint.Value)
                 {
                     Vector3 corr = stationTurret && applyBallistics ? ballisticOffset : Vector3.zero;
                     aimDir = _aimRayDir * aimDir.magnitude + corr;
@@ -217,7 +288,7 @@ namespace PlayableVehicles
                 if (_aimDirSmooth.TryGetValue(turret, out Vector3 prevDir))
                 {
                     aimDir = Vector3.Lerp(prevDir, aimDir,
-                        1f - Mathf.Exp(-Time.fixedDeltaTime / TurretAimTau));
+                        1f - Mathf.Exp(-Time.fixedDeltaTime / TurretAimTauActive));
                 }
                 _aimDirSmooth[turret] = aimDir;
                 if (_aimDirCmd.TryGetValue(turret, out Vector3 lastCmd)
@@ -230,8 +301,70 @@ namespace PlayableVehicles
                     _aimDirCmd[turret] = aimDir;
                 }
                 GameAccess.TurretAimTurret(turret, aimDir);
+                HoldBarrel(turret, aimDir);
 
                 if (i == 0) TurretForward = turret.transform.forward;
+            }
+        }
+
+        private void HoldBarrel(Turret turret, Vector3 aimDirection)
+        {
+            if (aimDirection.sqrMagnitude < 1e-6f) return;
+            _heldTurrets.Add(turret);
+            _heldDirections.Add(aimDirection.normalized);
+        }
+
+        public void StabilizeTurrets(float dt)
+        {
+            if (_heldTurrets.Count == 0 || dt <= 0f) return;
+            for (int i = 0; i < _heldTurrets.Count; i++)
+            {
+                Turret turret = _heldTurrets[i];
+                if (turret == null) continue;
+                Transform turretTransform = turret.transform;
+                Transform hull = turretTransform.parent;
+                if (hull == null) continue;
+                Transform elevation = GameAccess.TurretElevationTransform != null ? GameAccess.TurretElevationTransform(turret) : null;
+
+                Vector3 inHull = hull.InverseTransformDirection(_heldDirections[i]);
+                float targetYaw = Mathf.Atan2(inHull.x, inHull.z) * Mathf.Rad2Deg;
+                float targetPitch = -Mathf.Asin(Mathf.Clamp(inHull.y, -1f, 1f)) * Mathf.Rad2Deg;
+
+                GunState state;
+                int frame = Time.frameCount;
+                if (!_gunState.TryGetValue(turret, out state) || state.Frame != frame - 1)
+                {
+                    state = new GunState
+                    {
+                        Yaw = turretTransform.localEulerAngles.y,
+                        Pitch = elevation != null ? elevation.localEulerAngles.x : 0f,
+                        Frame = frame
+                    };
+                    _gunState[turret] = state;
+                }
+                else
+                {
+                    state.Frame = frame;
+                }
+
+                float traverseRate = GameAccess.TurretTraverseRate != null ? GameAccess.TurretTraverseRate(turret) : 38f;
+                float elevationRate = GameAccess.TurretElevationRate != null ? GameAccess.TurretElevationRate(turret) : 30f;
+                state.Yaw = Mathf.MoveTowardsAngle(state.Yaw, targetYaw, Mathf.Max(traverseRate, 0f) * dt);
+                float range = GameAccess.TurretTraverseRange != null ? GameAccess.TurretTraverseRange(turret) : 360f;
+                if (range < 360f) state.Yaw = Mathf.Clamp(state.Yaw, -range, range);
+                turretTransform.localEulerAngles = new Vector3(0f, state.Yaw, 0f);
+
+                if (elevation != null)
+                {
+                    state.Pitch = Mathf.MoveTowards(state.Pitch, targetPitch, Mathf.Max(elevationRate, 0f) * dt);
+                    float maxElevation = GameAccess.TurretMaxElevation != null ? GameAccess.TurretMaxElevation(turret) : 0f;
+                    float minElevation = GameAccess.TurretMinElevation != null ? GameAccess.TurretMinElevation(turret) : 0f;
+                    state.Pitch = Mathf.Clamp(state.Pitch, -maxElevation, -minElevation);
+                    elevation.localEulerAngles = new Vector3(state.Pitch, 0f, 0f);
+                    if (GameAccess.TurretElevationAngle != null) GameAccess.TurretElevationAngle(turret) = state.Pitch;
+                }
+
+                if (GameAccess.TurretTraverseAngle != null) GameAccess.TurretTraverseAngle(turret) = state.Yaw;
             }
         }
 
@@ -491,32 +624,28 @@ namespace PlayableVehicles
             Ray ray = VehicleCamera.ViewRay(mainCam);
             _aimRayDir = ray.direction;
             _aimRayValid = true;
-            Vector3 target;
+            float distance;
             if (AimRaycast.Cast(ray.origin, ray.direction, MaxAimDistance, _vehicle.transform, out RaycastHit hit))
             {
-                target = hit.point;
+                distance = hit.distance;
                 HasAimHit = true;
             }
             else
             {
-                target = ray.origin + ray.direction * NoHitAimDistance;
+                distance = NoHitAimDistance;
                 HasAimHit = false;
             }
 
-            Vector3 datum = Datum.originPosition;
-            _aimPointSmooth += datum - _aimPointDatum;
-            _aimPointDatum = datum;
-            if (!_aimPointSmoothValid || (target - _aimPointSmooth).sqrMagnitude > 250000f)
+            if (!_aimDistanceValid)
             {
-                _aimPointSmooth = target;
-                _aimPointSmoothValid = true;
+                _aimDistanceSmooth = distance;
+                _aimDistanceValid = true;
             }
             else
             {
-                _aimPointSmooth = Vector3.Lerp(_aimPointSmooth, target,
-                    1f - Mathf.Exp(-Time.deltaTime / AimPointTau));
+                _aimDistanceSmooth = Mathf.MoveTowards(_aimDistanceSmooth, distance, AimDistanceRate * Time.deltaTime);
             }
-            CurrentAimPoint = _aimPointSmooth;
+            CurrentAimPoint = ray.origin + ray.direction * _aimDistanceSmooth;
         }
 
         private const float MarkerInterval = 0.05f;
@@ -541,10 +670,9 @@ namespace PlayableVehicles
         private Vector3 _markerStage2;
         private Transform _markerSmoothMuzzle;
         private bool _markerSmoothValid;
-        private const float AimPointTau = 0.12f;
-        private Vector3 _aimPointSmooth;
-        private bool _aimPointSmoothValid;
-        private Vector3 _aimPointDatum;
+        private const float AimDistanceRate = 1200f;
+        private float _aimDistanceSmooth;
+        private bool _aimDistanceValid;
         private Vector3 _aimRayDir;
         private bool _aimRayValid;
         private const float TurretAimTau = 0.08f;
@@ -670,6 +798,20 @@ namespace PlayableVehicles
             SelectedStationIndex = index;
         }
 
+        private static bool StationIntact(WeaponStation station)
+        {
+            if (station == null || station.Weapons == null) return true;
+            for (int i = 0; i < station.Weapons.Count; i++)
+            {
+                Weapon weapon = station.Weapons[i];
+                if (weapon == null) return false;
+                UnitPart part = weapon.GetComponentInParent<UnitPart>();
+                if (part == null) continue;
+                if (part.IsDetached() || part.hitPoints <= 0f) return false;
+            }
+            return true;
+        }
+
         private bool FireSelectedWeapon()
         {
             if (_vehicle.weaponStations == null || _vehicle.weaponStations.Count == 0) return false;
@@ -681,6 +823,15 @@ namespace PlayableVehicles
 
             WeaponStation station = _vehicle.weaponStations[SelectedStationIndex];
             if (station == null || !station.Ready()) return false;
+            if (!StationIntact(station))
+            {
+                if (Time.time >= _nextNoRadarNotice)
+                {
+                    _nextNoRadarNotice = Time.time + NoRadarNoticeInterval;
+                    if (!Silent) ModLog.Notify("Weapon destroyed");
+                }
+                return false;
+            }
             if (FireMissions.NeedsRadar(station) && !FireMissions.HasRadar(_vehicle))
             {
                 if (Time.time >= _nextNoRadarNotice)

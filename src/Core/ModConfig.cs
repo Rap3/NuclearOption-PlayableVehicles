@@ -32,8 +32,10 @@ namespace PlayableVehicles
 
         public static ConfigEntry<bool> AircraftAutopilot { get; private set; }
         public static ConfigEntry<bool> BallisticComputer { get; private set; }
+        public static ConfigEntry<bool> AimAtCrosshairPoint { get; private set; }
         public static ConfigEntry<bool> LockAutoTrack { get; private set; }
         public static ConfigEntry<float> LockScreenRadius { get; private set; }
+        public static ConfigEntry<float> TurretTraverseScale { get; private set; }
 
         public static ConfigEntry<bool> ZonalArmor { get; private set; }
         public static ConfigEntry<bool> RequireMod { get; private set; }
@@ -49,19 +51,22 @@ namespace PlayableVehicles
 
         public static ConfigEntry<float> MouseSensitivityX { get; private set; }
         public static ConfigEntry<float> MouseSensitivityY { get; private set; }
-        public static ConfigEntry<float> CameraDistance { get; private set; }
         public static ConfigEntry<float> CameraMaxDistance { get; private set; }
-        public static ConfigEntry<float> ZoomFov { get; private set; }
+        public static ConfigEntry<float> SightZoomDefault { get; private set; }
+        public static ConfigEntry<float> SightZoomMax { get; private set; }
         public static ConfigEntry<float> ShakeScale { get; private set; }
         public static ConfigEntry<float> CameraMaxLookUp { get; private set; }
         public static ConfigEntry<float> VehicleOffsetMultiplier { get; private set; }
         public static ConfigEntry<float> CameraLookTau { get; private set; }
         public static ConfigEntry<float> CameraAimTau { get; private set; }
         public static ConfigEntry<float> CameraTau { get; private set; }
-        public static ConfigEntry<float> CameraVelTau { get; private set; }
         public static ConfigEntry<float> CameraAnimTau { get; private set; }
         public static ConfigEntry<float> CameraZoomTau { get; private set; }
         public static ConfigEntry<float> CameraZoomTauInc { get; private set; }
+        public static ConfigEntry<float> SightOffsetX { get; private set; }
+        public static ConfigEntry<float> SightOffsetY { get; private set; }
+        public static ConfigEntry<float> SightOffsetZ { get; private set; }
+        public static ConfigEntry<bool> SightForArtillery { get; private set; }
         public static ConfigEntry<float> CameraCollisionRadius { get; private set; }
         public static ConfigEntry<float> CameraMoveInSpeed { get; private set; }
         public static ConfigEntry<float> CameraMoveOutSpeed { get; private set; }
@@ -140,9 +145,18 @@ namespace PlayableVehicles
             LockAutoTrack = config.Bind("Aiming", "LockAutoTrack", true,
                 "The turret follows a locked target by itself, with lead. false - the turret follows the crosshair and the " +
                 "lead point is shown in the HUD for manual aiming");
+            AimAtCrosshairPoint = config.Bind("Aiming", "AimAtCrosshairPoint", true,
+                "The barrel converges on the point under the crosshair, so the camera ray and the barrel meet there " +
+                "(with the ballistic computer the shot lands on the crosshair). false - the old parallel aiming: the barrel " +
+                "keeps the camera ray's direction, the gun marker shows where the shell lands");
             LockScreenRadius = config.Bind("Aiming", "LockScreenRadius", 0.08f,
                 new ConfigDescription("How far from the screen centre Target Select looks for a target, as a fraction of the screen height",
                     new AcceptableValueRange<float>(0.01f, 0.5f)));
+            TurretTraverseScale = config.Bind("Aiming", "TurretTraverseScale", 1f,
+                new ConfigDescription("Multiplier for the turret's own traverse and elevation speed from the vehicle prefab. " +
+                    "1 - the game's speeds (a tank turret stays realistically slow), higher - snappier aiming. " +
+                    "The gun sight follows the barrel, so this also sets how fast the view settles after a swing",
+                    new AcceptableValueRange<float>(0.25f, 3f)));
 
             RequireMod = config.Bind("Server", "RequireMod", true,
                 "Players joining your game must have PlayableVehicles of the same network version: the mod replaces the " +
@@ -183,12 +197,14 @@ namespace PlayableVehicles
             MouseSensitivityY = config.Bind("Camera", "MouseSensitivityY", 1.4f,
                 new ConfigDescription("Vertical camera turn per unit of mouse movement, degrees. Only with [Controls] " +
                     "GameViewControls = false", new AcceptableValueRange<float>(0.1f, 20f)));
-            CameraDistance = config.Bind("Camera", "Distance", 11.5f,
-                new ConfigDescription("Starting camera distance from the vehicle, metres", new AcceptableValueRange<float>(3.5f, 60f)));
             CameraMaxDistance = config.Bind("Camera", "MaxDistance", 25f,
-                new ConfigDescription("Furthest the mouse wheel can pull the camera back, metres", new AcceptableValueRange<float>(3.5f, 100f)));
-            ZoomFov = config.Bind("Camera", "ZoomFov", 6f,
-                new ConfigDescription("Field of view in the gun sight (RMB), degrees", new AcceptableValueRange<float>(2f, 40f)));
+                new ConfigDescription("Furthest the mouse wheel can pull the camera back, metres (the camera always starts as close to the vehicle as the hull allows)",
+                    new AcceptableValueRange<float>(3.5f, 100f)));
+            SightZoomDefault = config.Bind("Camera", "SightZoomDefault", 4f,
+                new ConfigDescription("Gun sight magnification when it is raised (mouse wheel zooms from here up to SightZoomMax)",
+                    new AcceptableValueRange<float>(1f, 20f)));
+            SightZoomMax = config.Bind("Camera", "SightZoomMax", 12f,
+                new ConfigDescription("Maximum gun sight magnification, x", new AcceptableValueRange<float>(2f, 20f)));
             ShakeScale = config.Bind("Camera", "ShakeScale", 1f,
                 new ConfigDescription("Camera shake from shots, hits and nearby explosions (0 - no shake)",
                     new AcceptableValueRange<float>(0f, 2f)));
@@ -208,9 +224,6 @@ namespace PlayableVehicles
             CameraTau = config.Bind("Camera", "Tau", 0.07f,
                 new ConfigDescription("Camera position smoothing time, seconds (larger - heavier, lazier camera)",
                     new AcceptableValueRange<float>(0.01f, 1f)));
-            CameraVelTau = config.Bind("Camera", "VelTau", 0.22f,
-                new ConfigDescription("Camera velocity damping time, seconds (larger - less overshoot when the vehicle stops)",
-                    new AcceptableValueRange<float>(0.02f, 2f)));
             CameraAnimTau = config.Bind("Camera", "AnimTau", 0.08f,
                 new ConfigDescription("Smoothing of the hull bob (suspension animation), seconds",
                     new AcceptableValueRange<float>(0.01f, 0.5f)));
@@ -220,6 +233,15 @@ namespace PlayableVehicles
             CameraZoomTauInc = config.Bind("Camera", "ZoomTauInc", 0.25f,
                 new ConfigDescription("Extra smoothing added for a moment when the gun sight is raised or lowered, seconds " +
                     "(decays in 0.4 s, as in War Thunder)", new AcceptableValueRange<float>(0f, 1f)));
+            SightOffsetX = config.Bind("Camera", "SightOffsetX", 0f,
+                new ConfigDescription("Gun sight point offset, turret-local metres: X - right", new AcceptableValueRange<float>(-3f, 3f)));
+            SightOffsetY = config.Bind("Camera", "SightOffsetY", 0f,
+                new ConfigDescription("Gun sight point offset, turret-local metres: Y - up", new AcceptableValueRange<float>(-3f, 3f)));
+            SightOffsetZ = config.Bind("Camera", "SightOffsetZ", 0f,
+                new ConfigDescription("Gun sight point offset, turret-local metres: Z - forward", new AcceptableValueRange<float>(-3f, 3f)));
+            SightForArtillery = config.Bind("Camera", "SightForArtillery", false,
+                "Gun sight (RMB) for self-propelled artillery and MLRS. They fire through the fire mission menu, so by " +
+                "default RMB only zooms the third-person view; true - they get the same optic as the rest");
             CameraCollisionRadius = config.Bind("Camera", "CollisionRadius", 0.1f,
                 new ConfigDescription("Camera collision sphere radius, metres", new AcceptableValueRange<float>(0.02f, 1f)));
             CameraMoveInSpeed = config.Bind("Camera", "MoveInSpeed", 2f,

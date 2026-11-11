@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.2
+
+- **Towing fixed for the HLT-CRAM and HLT-HEL trailers.** Their nose sits about half a metre lower than on the R9
+  Stratolance trailer, so seating them by the saddle height left them 1.1-1.2 m above the ground: they dragged on two
+  wheels and barely turned. They now ride on their own wheels with a soft vertical coupling.
+- **Parked vehicles really stay parked.** The holding force was computed from a projection that is always
+  zero, and the parking branch switched itself off once a vehicle started moving, so vehicles crept on flat ground and
+  slid on slopes. Parking now holds up to about 40 degrees, the body is frozen up to 25 degrees like the game freezes
+  stationary vehicles, and steeper slopes are left to physics.
+- **Destroyed weapons no longer fire.** The game's own check looks only at fire rate, ammo and reload, so a wrecked
+  machine gun kept firing; fire is now blocked while the weapon's part is destroyed.
+- **Offroad dust is back**, for every vehicle including AI. It came from the game's suspension raycast job, which the
+  mod's running gear replaced in 1.1.0.
+- **Flatbed cargo:** mod-added containers longer than the bed now fit and overhang to the rear, are seated 0.6 m behind
+  the bed front so they no longer clip the cab, and count as payload in the truck's suspension instead of sagging it.
+- **Fixed:** a spectator (no faction picked) could board and drive vehicles of either side.
+
 ## 1.1.1
 
 - **Support for ground vehicles added by other mods** (tested with Aryx Weapons Pack and MC-260 Chimera): mod-added
@@ -7,10 +24,10 @@
   to the game AI, the fire control computer (B), working fold / unfold of vertical-launch launcher arms, and correct
   radar-link behavior for radar-dependent launchers. Compatibility with mods other than these two still needs
   verification.
-- The R9 Stratolance and RAM-45 missiles get their own images (in the depot purchase panel and in the vehicle
+- **The R9 Stratolance and RAM-45 missiles get their own images** (in the depot purchase panel and in the vehicle
   weapon list) instead of the game's generic missile icon.
-- Fixed: parked vehicles slowly creeping or sliding on slopes and when standing still (issue #8).
-- Fixed: LCV45 Recon Truck right-side wheels did not steer.
+- **Fixed**: parked vehicles slowly creeping or sliding on slopes and when standing still (issue #8).
+- **Fixed**: LCV45 Recon Truck right-side wheels did not steer.
 
 ## 1.1.0
 

@@ -170,11 +170,13 @@ namespace PlayableVehicles
             _rb.useGravity = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
 
+            _verticalShare = BodyLength(trailer) > LongBodyLength ? SoftVerticalShare : 1f;
             Vector3 front = KingpinPoint(trailer);
             Vector3 rear = SaddlePoint(tractor);
             Vector3 offset = tractor.transform.TransformPoint(rear) - trailer.transform.TransformPoint(front);
             _rb.position += offset;
             trailer.transform.position += offset;
+            SettleOnWheels(trailer);
 
             float standing = Physics.Raycast(trailer.transform.position, Vector3.down, out RaycastHit below, 10f,
                 PhysicsLayers.StaticsMask, QueryTriggerInteraction.Ignore) ? below.distance : 1f;
@@ -253,6 +255,47 @@ namespace PlayableVehicles
             if (names.Count > 0) ModLog.Info("Towing " + trailer.unitName + ": ground colliders off while towed: " + string.Join(", ", names));
         }
 
+        private static void SettleOnWheels(GroundVehicle trailer)
+        {
+            if (trailer == null || trailer.transform == null) return;
+            GameObject[] wheels = GameAccess.GroundVehicleWheels != null ? GameAccess.GroundVehicleWheels(trailer) : null;
+            if (wheels == null) return;
+            float bottom = float.MaxValue;
+            foreach (GameObject axle in wheels)
+            {
+                if (axle == null) continue;
+                Renderer renderer = axle.GetComponent<Renderer>();
+                if (renderer == null) continue;
+                float y = trailer.transform.InverseTransformPoint(renderer.bounds.min).y;
+                if (y < bottom) bottom = y;
+            }
+            if (bottom == float.MaxValue) return;
+            Vector3 position = trailer.transform.position;
+            if (!Physics.Raycast(position + Vector3.up * 5f, Vector3.down, out RaycastHit ground, 20f,
+                PhysicsLayers.StaticsMask, QueryTriggerInteraction.Ignore)) return;
+            float drop = (position.y + bottom) - ground.point.y;
+            if (Mathf.Abs(drop) < 0.01f) return;
+            trailer.transform.position -= Vector3.up * drop;
+            if (trailer.rb != null) trailer.rb.position -= Vector3.up * drop;
+            ModLog.Info("Towing " + trailer.unitName + ": settled on wheels, drop " + drop.ToString("F2") + " m");
+        }
+
+        private const float LongBodyLength = 8f;
+        private const float SoftVerticalShare = 0.15f;
+
+        private float _verticalShare = 1f;
+
+        private static float BodyLength(GroundVehicle trailer)
+        {
+            float best = 0f;
+            foreach (Collider collider in trailer.GetComponentsInChildren<Collider>())
+            {
+                if (!(collider is BoxCollider box) || box.isTrigger || !box.enabled) continue;
+                float length = Mathf.Abs(box.size.z * box.transform.lossyScale.z);
+                if (length > best) best = length;
+            }
+            return best;
+        }
         private void FixedUpdate()
         {
             if (_detached) return;
@@ -271,7 +314,9 @@ namespace PlayableVehicles
                 Vector3 frontW = Trailer.transform.TransformPoint(_anchorTrailer);
                 Vector3 error = frontW - rearW;
                 Vector3 relVel = _rb.GetPointVelocity(frontW) - Tractor.rb.GetPointVelocity(rearW);
-                Vector3 force = -(_spring * error + _damper * relVel);
+                Vector3 errorSoft = new Vector3(error.x, error.y * _verticalShare, error.z);
+                Vector3 relVelSoft = new Vector3(relVel.x, relVel.y * _verticalShare, relVel.z);
+                Vector3 force = -(_spring * errorSoft + _damper * relVelSoft);
                 if (force.magnitude > _breakForce)
                 {
                     Detach(PvLogisticsEvent.HitchBroke);

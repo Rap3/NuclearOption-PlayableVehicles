@@ -232,6 +232,7 @@ namespace PlayableVehicles
             ControlRegistry.Remove(_vehicle);
             ControlRegistry.RemoveClientSimulated(_vehicle);
             ArtilleryAi.Resume(_vehicle);
+            if (_own is WheeledDrive parkDrive) parkDrive.ReleaseParkAnchor();
 
             if (_vehicle != null && !_vehicle.disabled && _vehicle.IsSlung())
             {
@@ -461,7 +462,7 @@ namespace PlayableVehicles
 
         private void EnsureDynamicBody()
         {
-            if (_rb.isKinematic) _rb.isKinematic = false;
+            if (_rb.isKinematic && !(_own is WheeledDrive parkedDrive && parkedDrive.Parked)) _rb.isKinematic = false;
             if (_rb.interpolation != RigidbodyInterpolation.Interpolate) _rb.interpolation = RigidbodyInterpolation.Interpolate;
         }
 

@@ -270,6 +270,11 @@ namespace PlayableVehicles
         public static void EnterDeployed(GroundVehicle vehicle)
         {
             if (IsActive || vehicle == null || vehicle.disabled) return;
+            if (!GameManager.GetLocalHQ(out FactionHQ hq) || hq == null)
+            {
+                ModLog.Notify("Join a faction to drive vehicles (you are spectating)");
+                return;
+            }
             if (NetBridge.IsClientOnly) ClientLink.RequestEnter(vehicle);
             else Enter(vehicle, VehicleDriver.DriveMode.Local);
         }
@@ -300,13 +305,15 @@ namespace PlayableVehicles
                 return;
             }
 
-            if (GameManager.GetLocalHQ(out FactionHQ playerHQ))
+            if (!GameManager.GetLocalHQ(out FactionHQ playerHQ) || playerHQ == null)
             {
-                if (vehicle.NetworkHQ != null && playerHQ != null && vehicle.NetworkHQ != playerHQ)
-                {
-                    ModLog.Notify("Access Denied: Unit belongs to enemy faction!");
-                    return;
-                }
+                ModLog.Notify("Join a faction to drive vehicles (you are spectating)");
+                return;
+            }
+            if (vehicle.NetworkHQ != null && vehicle.NetworkHQ != playerHQ)
+            {
+                ModLog.Notify("Access Denied: Unit belongs to enemy faction!");
+                return;
             }
 
             if (!ModConfig.Enabled.Value)

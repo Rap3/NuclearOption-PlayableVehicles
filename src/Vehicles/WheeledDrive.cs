@@ -130,6 +130,12 @@ namespace PlayableVehicles
         private const float ParkDamping = 0.85f;
         private const float EngineBrake = 0.15f;
         private const float ParkBrake = 0.8f;
+        private const float ParkHoldSpeed = 1.5f;
+        private const float ParkMaxSlope = 25f;
+
+        private const float ParkSpeed = 2.5f;
+        private ParkAnchor _parkAnchor;
+        private const float ParkHoldMu = 0.9f;
         private const float SteerRate = 1.5f;
         private const float SteerFadeSpeed = 14f;
         private const float MaxLateralAccel = 6.5f;
@@ -189,6 +195,24 @@ namespace PlayableVehicles
         private GroundVehicle _vehicle;
         private Rigidbody _rb;
         private float _mass;
+        private float _specMass;
+        private float _payloadMass;
+
+        private const float RollSpring = 4.5f;
+        private const float MaxRollTorque = 6f;
+        private const float RollMinSpeed = 1f;
+        private const float PayloadGripBoost = 1.6f;
+        private const float RollDamping = 2.5f;
+        private const float PayloadRollBoost = 1.5f;
+
+        private static readonly Dictionary<GroundVehicle, WheeledDrive> Registry = new Dictionary<GroundVehicle, WheeledDrive>();
+
+        public static WheeledDrive For(GroundVehicle vehicle)
+        {
+            if (vehicle == null) return null;
+            if (Registry.Count > 4096) Registry.Clear();
+            return Registry.TryGetValue(vehicle, out WheeledDrive drive) && drive != null ? drive : null;
+        }
         private float _pivotZ;
         private float _wheelbase;
         private float _steerAngle;
@@ -234,6 +258,8 @@ namespace PlayableVehicles
             _rb = rb;
             if (_spec == null || rb == null) return false;
             _mass = _spec.MassOf(vehicle);
+            _specMass = _mass;
+            Registry[vehicle] = this;
             BuildWheels();
             _steerAngle = 0f;
             _engine.Init(_spec);
@@ -300,6 +326,8 @@ namespace PlayableVehicles
             track /= locals.Count;
 
             _mass = vehicle.definition != null && vehicle.definition.mass > 0f ? vehicle.definition.mass : rb.mass;
+            _specMass = _mass;
+            Registry[vehicle] = this;
             _spec = new WheeledSpec
             {
                 Prefab = vehicle.definition != null && vehicle.definition.unitPrefab != null ? vehicle.definition.unitPrefab.name : "trailer",
@@ -319,6 +347,23 @@ namespace PlayableVehicles
         }
 
         private const float TowedCoMHeight = 1.0f;
+
+        public bool Parked => _parkAnchor != null && _parkAnchor.Active;
+
+        public void ReleaseParkAnchor()
+        {
+            if (_parkAnchor != null) _parkAnchor.Active = false;
+        }
+
+        public void SetPayload(float mass)
+        {
+            if (_towed || _spec == null) return;
+            mass = Mathf.Max(0f, mass);
+            if (Mathf.Abs(mass - _payloadMass) < 1f) return;
+            _payloadMass = mass;
+            _mass = _specMass + _payloadMass;
+            BuildWheels();
+        }
 
         public void SetTowedBrake(float brake)
         {
@@ -401,7 +446,23 @@ namespace PlayableVehicles
             _steerAngle = Mathf.MoveTowards(_steerAngle, steer * maxAngle, SteerRate * dt);
             SetWheelAngles();
 
-            bool parked = !_towed && Mathf.Abs(throttle) < 0.05f && Mathf.Abs(Speed) < 1f;
+        bool parked = !_towed && Mathf.Abs(throttle) < 0.05f && Mathf.Abs(Speed) < ParkSpeed;
+            if (_vehicle != null)
+            {
+                if (_parkAnchor == null) _parkAnchor = _vehicle.gameObject.AddComponent<ParkAnchor>();
+                _parkAnchor.Body = _rb;
+                bool deployed = VehicleDeploy.CanDeploy(_vehicle) && VehicleDeploy.IsDeployed(_vehicle);
+                float parkSlope = 0f;
+                if (_wheels != null)
+                {
+                    for (int wi = 0; wi < _wheels.Length; wi++)
+                    {
+                        if (!_wheels[wi].Contact) continue;
+                        parkSlope = Mathf.Max(parkSlope, Vector3.Angle(Vector3.up, _wheels[wi].Normal));
+                    }
+                }
+                _parkAnchor.Active = parked && !deployed && parkSlope <= ParkMaxSlope;
+            }
             float demand = Mathf.Abs(throttle);
             if (!_towed) _engine.Update(throttle, false, demand, Speed);
 
@@ -455,7 +516,6 @@ namespace PlayableVehicles
             int[] surfaceVotes = new int[6];
             float maxStopPerWheel = _mass / Mathf.Max(1, touching) / dt;
             Vector3 up = t.up;
-            Vector3 gFlat = Vector3.ProjectOnPlane(Physics.gravity, Vector3.up);
             for (int i = 0; i < _wheels.Length; i++)
             {
                 ref Wheel w = ref _wheels[i];
@@ -473,6 +533,7 @@ namespace PlayableVehicles
                 float vLat = Vector3.Dot(pv, side);
 
                 Grip grip = Grips[(int)w.Surface];
+                float mu = _payloadMass > 0f && !parked ? grip.Mu * PayloadGripBoost : grip.Mu;
                 float limit = grip.Mu * w.Load;
                 float share = totalLoad > 0f ? w.Load / totalLoad : 0f;
                 float rolling = grip.Rolling * (grip.Rough ? 1f + vLong * vLong / (RoughSpeed * RoughSpeed) : 1f);
@@ -482,7 +543,10 @@ namespace PlayableVehicles
                 float fLat = 0f;
                 if (parked)
                 {
-                    Vector3 hold = -gFlat * (_mass * share);
+                    Vector3 slopeDown = Physics.gravity - Vector3.Dot(Physics.gravity, normal) * normal;
+                    Vector3 hold = -slopeDown * (_mass * share);
+                    float maxHold = ParkHoldMu * w.Load;
+                    if (hold.sqrMagnitude > maxHold * maxHold) hold = hold.normalized * maxHold;
                     fLong += Vector3.Dot(hold, fwd);
                     fLat += Vector3.Dot(hold, side);
                     fLong -= ParkDamping * maxStopPerWheel * vLong;
@@ -491,7 +555,7 @@ namespace PlayableVehicles
                 else
                 {
                     fLong -= brake * limit * GroundProbe.Tanh(vLong / LongSlipScale);
-                    fLat = -grip.Mu * w.Load * GroundProbe.Tanh(vLat / Mathf.Max(LateralSlipScale, Mathf.Abs(vLong) * PeakSlipTan));
+                    fLat = -mu * w.Load * GroundProbe.Tanh(vLat / Mathf.Max(LateralSlipScale, Mathf.Abs(vLong) * PeakSlipTan));
                 }
                 fLong -= rolling * w.Load * GroundProbe.Tanh(vLong / 0.3f);
 
@@ -512,7 +576,7 @@ namespace PlayableVehicles
                     fLat *= k;
                 }
 
-                _rb.AddForceAtPosition(up * w.Load + fwd * fLong + side * fLat, w.Point);
+                _rb.AddForceAtPosition(normal * w.Load + fwd * fLong + side * fLat, w.Point);
             }
 
             Contacts = touching;
@@ -525,6 +589,59 @@ namespace PlayableVehicles
             }
             Surface = (Surface)best;
             RadarAlt = Grounded ? 0f : GroundProbe.Height(t, _rb, t.TransformPoint(new Vector3(0f, _spec.WheelBottomY, 0f)), 200f, _hits);
+            if (parked && _rb != null)
+            {
+                Vector3 parkedVelocity = _rb.velocity;
+                Vector3 creep = Vector3.ProjectOnPlane(parkedVelocity, Vector3.up);
+                if (creep.sqrMagnitude < ParkHoldSpeed * ParkHoldSpeed) _rb.velocity = parkedVelocity - creep;
+            }
+            EmitContactDust();
+            StabilizeRoll();
+        }
+
+        private const float ContactDustInterval = 0.11f;
+        private int _dustWheel;
+        private float _nextDustTime;
+
+        private void StabilizeRoll()
+        {
+            if (_payloadMass <= 0f || _rb == null || _vehicle == null || _wheels == null) return;
+            if (Mathf.Abs(Speed) < RollMinSpeed) return;
+            Vector3 normal = Vector3.zero;
+            int contacts = 0;
+            foreach (Wheel wheel in _wheels)
+            {
+                if (!wheel.Contact) continue;
+                normal += wheel.Normal;
+                contacts++;
+            }
+            if (contacts == 0) return;
+            normal /= contacts;
+            Transform t = _vehicle.transform;
+            Vector3 forward = t.forward;
+            float tilt = Mathf.Clamp(Vector3.SignedAngle(normal, t.up, forward), -15f, 15f);
+            float rate = Vector3.Dot(_rb.angularVelocity, forward);
+            float load = 1f + _payloadMass / Mathf.Max(1f, _specMass) * PayloadRollBoost;
+            float torque = Mathf.Clamp(-(tilt * RollSpring + rate * RollDamping) * load, -MaxRollTorque, MaxRollTorque);
+            _rb.AddTorque(forward * torque, ForceMode.Acceleration);
+        }
+
+        private void EmitContactDust()
+        {
+            if (_towed || _vehicle == null || _wheels == null || _wheels.Length == 0) return;
+            if (!Grounded || OnPaved) return;
+            if (_vehicle.speed <= 2f) return;
+            if (!GameManager.ShowEffects) return;
+            if (Time.time < _nextDustTime) return;
+            _nextDustTime = Time.time + ContactDustInterval;
+            for (int tries = 0; tries < _wheels.Length; tries++)
+            {
+                _dustWheel = (_dustWheel + 1) % _wheels.Length;
+                Wheel wheel = _wheels[_dustWheel];
+                if (!wheel.Contact) continue;
+                _vehicle.ContactDustParticles(wheel.Point);
+                return;
+            }
         }
 
         private void SetWheelAngles()
@@ -579,6 +696,32 @@ namespace PlayableVehicles
                 float force = AntiRoll * 0.5f * (l.Spring + r.Spring) * (Mathf.Min(l.Compression, travel) - Mathf.Min(r.Compression, travel));
                 l.Load = Mathf.Clamp(l.Load + force, 0f, l.MaxLoad);
                 r.Load = Mathf.Clamp(r.Load - force, 0f, r.MaxLoad);
+            }
+        }
+    }
+
+    internal sealed class ParkAnchor : MonoBehaviour
+    {
+        public Rigidbody Body;
+        public bool Active;
+
+        private bool _frozen;
+
+        private void FixedUpdate()
+        {
+            if (Body == null) return;
+            if (Active)
+            {
+                if (_frozen) return;
+                Body.velocity = Vector3.zero;
+                Body.angularVelocity = Vector3.zero;
+                Body.isKinematic = true;
+                _frozen = true;
+            }
+            else if (_frozen)
+            {
+                Body.isKinematic = false;
+                _frozen = false;
             }
         }
     }
