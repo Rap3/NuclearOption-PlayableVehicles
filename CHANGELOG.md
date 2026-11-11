@@ -16,6 +16,7 @@
 - **Flatbed cargo:** mod-added containers longer than the bed now fit and overhang to the rear, are seated 0.6 m behind
   the bed front so they no longer clip the cab, and count as payload in the truck's suspension instead of sagging it.
 - **Fixed:** a spectator (no faction picked) could board and drive vehicles of either side.
+- **Vehicle camera has been redesigned.** The binoculars have been converted into a gunsight for vehicles equipped with weaponry.
 
 ## 1.1.1
 
